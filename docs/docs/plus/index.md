@@ -17,7 +17,7 @@ Information on how to integrate Frigate+ with Frigate can be found in the [integ
 
 ## Available model types
 
-There are two model types offered in Frigate+: `mobiledet` and `yolonas`. Both of these models are object detection models and are trained to detect the same set of labels [listed below](#available-label-types).
+There are two model types offered in Frigate+, `mobiledet` and `yolonas`. Both of these models are object detection models and are trained to detect the same set of labels [listed below](#available-label-types).
 
 Not all model types are supported by all detectors, so it's important to choose a model type to match your detector as shown in the table under [supported detector types](#supported-detector-types).
 
@@ -48,7 +48,15 @@ _\* Requires Frigate 0.15_
 
 ## Available label types
 
-Frigate+ models support a more relevant set of objects for security cameras. Currently, only the following objects are supported: `person`, `face`, `car`, `license_plate`, `amazon`, `ups`, `fedex`, `package`, `dog`, `cat`, `deer`. Other object types available in the default Frigate model are not available. Additional object types will be added in future releases.
+Frigate+ models support a more relevant set of objects for security cameras. Currently, the following objects are supported:
+
+- **People**: `person`, `face`
+- **Vehicles**: `car`, `motorcycle`, `bicycle`, `boat`, `license_plate`
+- **Delivery Logos**: `amazon`, `usps`, `ups`, `fedex`, `dhl`, `an_post`, `purolator`, `postnl`, `nzpost`, `postnord`, `gls`, `dpd`
+- **Animals**: `dog`, `cat`, `deer`, `horse`, `bird`, `raccoon`, `fox`, `bear`, `cow`, `squirrel`, `goat`, `rabbit`
+- **Other**: `package`, `waste_bin`, `bbq_grill`, `robot_lawnmower`, `umbrella`
+
+Other object types available in the default Frigate model are not available. Additional object types will be added in future releases.
 
 ### Label attributes
 
@@ -75,6 +83,6 @@ When using Frigate+ models, Frigate will choose the snapshot of a person object 
 
 ![Face Attribute](/img/plus/attribute-example-face.jpg)
 
-`amazon`, `ups`, and `fedex` labels are used to automatically assign a sub label to car objects.
+Delivery logos such as `amazon`, `ups`, and `fedex` labels are used to automatically assign a sub label to car objects.
 
 ![Fedex Attribute](/img/plus/attribute-example-fedex.jpg)
