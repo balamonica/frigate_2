@@ -20,7 +20,6 @@ Some examples (model - class or model name)::
     > migrator.add_default(model, field_name, default)
 
 """
-
 import peewee as pw
 
 SQL = pw.SQL

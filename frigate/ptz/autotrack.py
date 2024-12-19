@@ -608,9 +608,9 @@ class PtzAutoTracker:
         ) ** self.zoom_factor[camera]
 
         if "original_target_box" not in self.tracked_object_metrics[camera]:
-            self.tracked_object_metrics[camera]["original_target_box"] = (
-                self.tracked_object_metrics[camera]["target_box"]
-            )
+            self.tracked_object_metrics[camera][
+                "original_target_box"
+            ] = self.tracked_object_metrics[camera]["target_box"]
 
         (
             self.tracked_object_metrics[camera]["valid_velocity"],

@@ -40,9 +40,9 @@ class TestFfmpegPresets(unittest.TestCase):
         FrigateConfig(**self.default_ffmpeg)
 
     def test_ffmpeg_hwaccel_preset(self):
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["hwaccel_args"] = (
-            "preset-rpi-64-h264"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"][
+            "hwaccel_args"
+        ] = "preset-rpi-64-h264"
         frigate_config = FrigateConfig(**self.default_ffmpeg)
         assert "preset-rpi-64-h264" not in (
             " ".join(frigate_config.cameras["back"].ffmpeg_cmds[0]["cmd"])
@@ -52,18 +52,18 @@ class TestFfmpegPresets(unittest.TestCase):
         )
 
     def test_ffmpeg_hwaccel_not_preset(self):
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["hwaccel_args"] = (
-            "-other-hwaccel args"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"][
+            "hwaccel_args"
+        ] = "-other-hwaccel args"
         frigate_config = FrigateConfig(**self.default_ffmpeg)
         assert "-other-hwaccel args" in (
             " ".join(frigate_config.cameras["back"].ffmpeg_cmds[0]["cmd"])
         )
 
     def test_ffmpeg_hwaccel_scale_preset(self):
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["hwaccel_args"] = (
-            "preset-nvidia-h264"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"][
+            "hwaccel_args"
+        ] = "preset-nvidia-h264"
         self.default_ffmpeg["cameras"]["back"]["detect"] = {
             "height": 1920,
             "width": 2560,
@@ -81,9 +81,9 @@ class TestFfmpegPresets(unittest.TestCase):
     def test_default_ffmpeg_input_arg_preset(self):
         frigate_config = FrigateConfig(**self.default_ffmpeg)
 
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["input_args"] = (
-            "preset-rtsp-generic"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"][
+            "input_args"
+        ] = "preset-rtsp-generic"
         frigate_preset_config = FrigateConfig(**self.default_ffmpeg)
         assert (
             # Ignore global and user_agent args in comparison
@@ -92,9 +92,9 @@ class TestFfmpegPresets(unittest.TestCase):
         )
 
     def test_ffmpeg_input_preset(self):
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["input_args"] = (
-            "preset-rtmp-generic"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"][
+            "input_args"
+        ] = "preset-rtmp-generic"
         frigate_config = FrigateConfig(**self.default_ffmpeg)
         assert "preset-rtmp-generic" not in (
             " ".join(frigate_config.cameras["back"].ffmpeg_cmds[0]["cmd"])
@@ -122,9 +122,9 @@ class TestFfmpegPresets(unittest.TestCase):
         )
 
     def test_ffmpeg_output_record_preset(self):
-        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["output_args"]["record"] = (
-            "preset-record-generic-audio-aac"
-        )
+        self.default_ffmpeg["cameras"]["back"]["ffmpeg"]["output_args"][
+            "record"
+        ] = "preset-record-generic-audio-aac"
         frigate_config = FrigateConfig(**self.default_ffmpeg)
         assert "preset-record-generic-audio-aac" not in (
             " ".join(frigate_config.cameras["back"].ffmpeg_cmds[0]["cmd"])

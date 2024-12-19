@@ -315,9 +315,9 @@ class OnvifController:
             and configs.DefaultRelativePanTiltTranslationSpace is not None
         ):
             supported_features.append("pt-r-fov")
-            self.cams[camera_name]["relative_fov_range"] = (
-                ptz_config.Spaces.RelativePanTiltTranslationSpace[fov_space_id]
-            )
+            self.cams[camera_name][
+                "relative_fov_range"
+            ] = ptz_config.Spaces.RelativePanTiltTranslationSpace[fov_space_id]
 
         self.cams[camera_name]["features"] = supported_features
 
