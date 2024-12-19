@@ -12,8 +12,8 @@ RUN pip3 wheel --wheel-dir=/rk-wheels -c /requirements-wheels.txt -r /requiremen
 FROM deps AS rk-frigate
 ARG TARGETARCH
 
-RUN --mount=type=bind,from=rk-wheels,source=/rk-wheels,target=/deps/rk-wheels \
-    pip3 install -U /deps/rk-wheels/*.whl
+RUN --mount=type=bind,from=rk-wheels,source=/rk-wheels,target=/deps/rk-wheels \ 
+    pip3 install -U /deps/rk-wheels/*.whl 
 
 WORKDIR /opt/frigate/
 COPY --from=rootfs / /

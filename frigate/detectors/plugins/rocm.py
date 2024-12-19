@@ -1,4 +1,5 @@
 import ctypes
+import glob
 import logging
 import os
 import subprocess
@@ -15,6 +16,7 @@ from frigate.detectors.detector_config import (
     ModelTypeEnum,
     PixelFormatEnum,
 )
+from frigate.detectors.util import preprocess, yolov8_postprocess
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,23 @@ class ROCmDetector(DetectionApi):
         if detector_config.conserve_cpu:
             logger.info("AMD/ROCm: switching HIP to blocking mode to conserve CPU")
             ctypes.CDLL("/opt/rocm/lib/libamdhip64.so").hipSetDeviceFlags(4)
+        assert (
+            detector_config.model.model_type == "yolov8"
+        ), "AMD/ROCm: detector_config.model.model_type: only yolov8 supported"
+        assert (
+            detector_config.model.input_tensor == "nhwc"
+        ), "AMD/ROCm: detector_config.model.input_tensor: only nhwc supported"
+        if detector_config.model.input_pixel_format != "rgb":
+            logger.warn(
+                "AMD/ROCm: detector_config.model.input_pixel_format: should be 'rgb' for yolov8, but '{detector_config.model.input_pixel_format}' specified!"
+            )
+
+        assert detector_config.model.path is not None, (
+            "No model.path configured, please configure model.path and model.labelmap_path; some suggestions: "
+            + ", ".join(glob.glob("/config/model_cache/yolov8/*.onnx"))
+            + " and "
+            + ", ".join(glob.glob("/config/model_cache/yolov8/*_labels.txt"))
+        )
 
         self.h = detector_config.model.height
         self.w = detector_config.model.width

@@ -1,8 +1,18 @@
 import logging
 import os.path
-import re
 import urllib.request
+import re
 from typing import Literal
+
+import numpy as np
+
+try:
+    from hide_warnings import hide_warnings
+except:  # noqa: E722
+
+    def hide_warnings(func):
+        pass
+
 
 from pydantic import Field
 
@@ -14,6 +24,14 @@ logger = logging.getLogger(__name__)
 DETECTOR_KEY = "rknn"
 
 supported_socs = ["rk3562", "rk3566", "rk3568", "rk3576", "rk3588"]
+
+yolov8_suffix = {
+    "default-yolov8n": "n",
+    "default-yolov8s": "s",
+    "default-yolov8m": "m",
+    "default-yolov8l": "l",
+    "default-yolov8x": "x",
+}
 
 supported_models = {ModelTypeEnum.yolonas: "^deci-fp16-yolonas_[sml]$"}
 
