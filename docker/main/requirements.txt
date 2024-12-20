@@ -1,4 +1,4 @@
-scikit-build == 0.17.*
+scikit-build == 0.18.*
 nvidia-pyindex
 #numpy
 #bytetracker
