@@ -22,7 +22,7 @@ class OvDetectorConfig(BaseDetectorConfig):
 
 class OvDetector(DetectionApi):
     type_key = DETECTOR_KEY
-    supported_models = [ModelTypeEnum.ssd, ModelTypeEnum.yolonas, ModelTypeEnum.yolox]
+    supported_models = [ModelTypeEnum.ssd, ModelTypeEnum.yolonas, ModelTypeEnum.yolox, ModelTypeEnum.yolov8]
 
     def __init__(self, detector_config: OvDetectorConfig):
         self.ov_core = ov.Core()
@@ -154,7 +154,8 @@ class OvDetector(DetectionApi):
         infer_request = self.interpreter.create_infer_request()
         # TODO: see if we can use shared_memory=True
         input_tensor = ov.Tensor(array=tensor_input)
-        infer_request.infer(input_tensor)
+        #followingline commented by monica
+        #infer_request.infer(input_tensor)    
 
         detections = np.zeros((20, 6), np.float32)
 
