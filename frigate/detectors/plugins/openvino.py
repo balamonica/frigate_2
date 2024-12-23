@@ -9,6 +9,7 @@ from typing_extensions import Literal
 
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig, ModelTypeEnum
+from frigate.detectors.util import preprocess, yolov8_postprocess
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +154,13 @@ class OvDetector(DetectionApi):
     def detect_raw(self, tensor_input):
         infer_request = self.interpreter.create_infer_request()
         # TODO: see if we can use shared_memory=True
-        input_tensor = ov.Tensor(array=tensor_input)
+        if self.ov_model_type == ModelTypeEnum.yolov8:
+            model_input_shape = self.model.get_inputs()[0].shape
+            input_tensor= preprocess(tensor_input, model_input_shape, np.float32)
+        else:
+            input_tensor = ov.Tensor(array=tensor_input)
         #followingline commented by monica
-        #infer_request.infer(input_tensor)    
+        infer_request.infer(input_tensor)    
 
         detections = np.zeros((20, 6), np.float32)
 
