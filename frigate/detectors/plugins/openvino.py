@@ -155,7 +155,7 @@ class OvDetector(DetectionApi):
         # TODO: see if we can use shared_memory=True
         input_tensor = ov.Tensor(array=tensor_input)
         #followingline commented by monica
-        infer_request.infer(input_tensor)    
+        #infer_request.infer(input_tensor)    
 
         detections = np.zeros((20, 6), np.float32)
 
