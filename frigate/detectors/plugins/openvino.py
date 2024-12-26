@@ -183,6 +183,10 @@ class OvDetector(DetectionApi):
                     ymax,
                     xmax,
                 ]
+
+            # Print the shape of the detections array
+            print("Detections shape:", detections.shape)
+
             return detections
 
         if self.ov_model_type == ModelTypeEnum.yolonas:
@@ -259,7 +263,8 @@ class OvDetector(DetectionApi):
                     object_detected[:4],
                 )
             # Output the detections before returning
-            print("Detections:", detections)
+            #print("Detections:", detections)
+            print("Detections shape yolov8:", detections.shape)
             return detections
         elif self.ov_model_type == ModelTypeEnum.yolov5:
             out_tensor = infer_request.get_output_tensor()
