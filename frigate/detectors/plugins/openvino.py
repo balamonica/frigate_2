@@ -23,7 +23,7 @@ class OvDetectorConfig(BaseDetectorConfig):
 
 class OvDetector(DetectionApi):
     type_key = DETECTOR_KEY
-    supported_models = [ModelTypeEnum.ssd, ModelTypeEnum.yolonas, ModelTypeEnum.yolox, ModelTypeEnum.yolov8]
+    supported_models = [ModelTypeEnum.ssd, ModelTypeEnum.yolonas, ModelTypeEnum.yolox, ModelTypeEnum.yolov8, ModelTypeEnum.yolov11]
 
     def __init__(self, detector_config: OvDetectorConfig):
         self.ov_core = ov.Core()
@@ -154,7 +154,7 @@ class OvDetector(DetectionApi):
     def detect_raw(self, tensor_input):
         infer_request = self.interpreter.create_infer_request()
         # TODO: see if we can use shared_memory=True
-        if self.ov_model_type == ModelTypeEnum.yolov8:
+        if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
             # Get the model input shape
             model_input_shape = self.interpreter.inputs[0].shape  # Get the input shape from the interpreter
             # Preprocess the input tensor
@@ -239,8 +239,8 @@ class OvDetector(DetectionApi):
             return detections
 
         # Add the YOLOv8 output processing here
-        elif self.ov_model_type == ModelTypeEnum.yolov8:
-            print("Reached YOLOv8 model processing")
+        if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
+            #print("Reached YOLOv8 model processing")
             out_tensor = infer_request.get_output_tensor()
             results = out_tensor.data[0]
             output_data = np.transpose(results)
@@ -264,7 +264,7 @@ class OvDetector(DetectionApi):
                 )
             # Output the detections before returning
             #print("Detections:", detections)
-            print("Detections shape yolov8:", detections.shape)
+            #print("Detections shape yolov8:", detections.shape)
             return detections
         elif self.ov_model_type == ModelTypeEnum.yolov5:
             out_tensor = infer_request.get_output_tensor()

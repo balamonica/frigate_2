@@ -99,7 +99,7 @@ class ONNXDetector(DetectionApi):
                     x_max / self.w,
                 ]
             return detections
-        elif self.onnx_model_type == ModelTypeEnum.yolov8:
+        elif self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
             model_input_shape = self.model.get_inputs()[0].shape
             
             #print("Reached onnx.py yolov8") #for debug
