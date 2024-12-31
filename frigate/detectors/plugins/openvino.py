@@ -185,7 +185,7 @@ class OvDetector(DetectionApi):
                 ]
 
             # Print the shape of the detections array
-            print("Detections shape:", detections.shape)
+            #print("Detections shape:", detections.shape) #for debug
 
             return detections
 

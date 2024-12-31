@@ -102,7 +102,7 @@ class ONNXDetector(DetectionApi):
         elif self.onnx_model_type == ModelTypeEnum.yolov8:
             model_input_shape = self.model.get_inputs()[0].shape
             
-            print("Reached onnx.py yolov8")
+            #print("Reached onnx.py yolov8") #for debug
 
             tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
 
