@@ -4,6 +4,8 @@ import logging
 import numpy as np
 from pydantic import Field
 from typing_extensions import Literal
+import pandas as pd
+import cv2
 
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import (
@@ -21,6 +23,11 @@ DETECTOR_KEY = "onnx"
 class ONNXDetectorConfig(BaseDetectorConfig):
     type: Literal[DETECTOR_KEY]
     device: str = Field(default="AUTO", title="Device Type")
+
+
+def write_attributes_to_excel(detected_attributes, output_file="human_attributes.xlsx"):
+    df = pd.DataFrame([attr["attributes"] for attr in detected_attributes])
+    df.to_excel(output_file, index=False)
 
 
 class ONNXDetector(DetectionApi):
@@ -103,12 +110,58 @@ class ONNXDetector(DetectionApi):
             model_input_shape = self.model.get_inputs()[0].shape
             
             #print("Reached onnx.py yolov8") #for debug
-
+ 
             tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
 
             tensor_output = self.model.run(None, {model_input_name: tensor_input})[0]
 
             return yolov8_postprocess(model_input_shape, tensor_output)
+        
+        elif self.onnx_model_type == ModelTypeEnum.yolov11_humanattr:
+            model_input_shape = self.model.get_inputs()[0].shape
+            print("Reached onnx.py yolov11_humanattr") 
+            tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
+            tensor_output = self.model.run(None, {model_input_name: tensor_input})[0]
+            detections = yolov8_postprocess(model_input_shape, tensor_output) 
+            
+            # Filter person detections first
+            person_detections = [d for d in detections if d[0] == 1]  # class_id == 1 for person
+            if not person_detections:
+                return detections
+                
+            # Prepare batch of crops
+            batch_crops = []
+            for detection in person_detections:
+                _, _, y_min, x_min, y_max, x_max = detection
+                crop = tensor_input[0, :, 
+                                  int(y_min * self.h):int(y_max * self.h), 
+                                  int(x_min * self.w):int(x_max * self.w)]
+                
+                # Resize and preprocess
+                resized_crop = cv2.resize(crop.transpose(1, 2, 0), (192, 256))
+                processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
+                batch_crops.append(processed_crop)
+            
+            # Stack all crops into a single batch
+            if batch_crops:
+                batch_input = np.stack(batch_crops, axis=0)
+                
+                # Run human attribute detection on entire batch
+                batch_attributes = self.human_attr_model.run(None, 
+                    {self.human_attr_model.get_inputs()[0].name: batch_input})[0]
+                
+                # Store results
+                detected_attributes = []
+                for i, detection in enumerate(person_detections):
+                    _, _, y_min, x_min, y_max, x_max = detection
+                    detected_attributes.append({
+                        "bbox": [x_min, y_min, x_max, y_max],
+                        "attributes": batch_attributes[i]
+                    })
+                
+                write_attributes_to_excel(detected_attributes)
+            
+            return detections
 
         else:
             tensor_output = self.model.run(None, {model_input_name: tensor_input})

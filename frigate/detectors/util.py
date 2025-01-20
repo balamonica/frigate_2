@@ -36,7 +36,7 @@ def preprocess(tensor_input, model_input_shape, model_input_element_type):
     )
 
 
-def yolov8_postprocess(
+def  yolov8_postprocess(
     model_input_shape,
     tensor_output,
     box_count=20,

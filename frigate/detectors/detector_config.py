@@ -39,6 +39,7 @@ class ModelTypeEnum(str, Enum):
     yolov5 = "yolov5"
     yolov8 = "yolov8"
     yolov11 = "yolov11"
+    yolov11_humanattr="yolov11_humanattr"
 
 
 class ModelConfig(BaseModel):
@@ -67,6 +68,11 @@ class ModelConfig(BaseModel):
     model_type: ModelTypeEnum = Field(
         default=ModelTypeEnum.ssd, title="Object Detection Model Type"
     )
+    human_attr_model_path: Optional[str] = Field(None, title="Human Attribute Detection model path.")
+    human_attr_labelmap_path: Optional[str] = Field(None, title="Label map for human attribute detector.")
+    human_attr_width: int = Field(default=320, title="Human Attribute Detection model input width.")
+    human_attr_height: int = Field(default=320, title="Human Attribute Detection model input height.")
+
     _merged_labelmap: Optional[Dict[int, str]] = PrivateAttr()
     _colormap: Dict[int, Tuple[int, int, int]] = PrivateAttr()
     _all_attributes: list[str] = PrivateAttr()
@@ -95,6 +101,12 @@ class ModelConfig(BaseModel):
 
     def __init__(self, **config):
         super().__init__(**config)
+        if self.model_type == ModelTypeEnum.yolov11_humanattr:
+            # Read the human attribute model paths and dimensions
+            self.human_attr_model_path = config.get("human_attr_model_path", None)
+            self.human_attr_labelmap_path = config.get("human_attr_labelmap_path", None)
+            self.human_attr_width = config.get("human_attr_width", 320)
+            self.human_attr_height = config.get("human_attr_height", 320)        
 
         self._merged_labelmap = {
             **load_labels(config.get("labelmap_path", "/labelmap.txt")),
