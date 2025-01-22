@@ -307,5 +307,6 @@ ymins
 yolo
 yolonas
 yolox
+yolov11_humanattr
 zeep
 zerolatency

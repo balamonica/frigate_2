@@ -103,6 +103,7 @@ def run_detector(
     start,
     detector_config,
 ):
+    print("detector_name:",name)
     threading.current_thread().name = f"detector:{name}"
     logger = logging.getLogger(f"detector.{name}")
     logger.info(f"Starting detection process: {os.getpid()}")
@@ -118,6 +119,7 @@ def run_detector(
     signal.signal(signal.SIGINT, receiveSignal)
 
     frame_manager = SharedMemoryFrameManager()
+    print("detector_config",detector_config)
     object_detector = LocalObjectDetector(detector_config=detector_config)
 
     outputs = {}
@@ -142,7 +144,10 @@ def run_detector(
 
         # detect and send the output
         start.value = datetime.datetime.now().timestamp()
+        print('in object_detector')
+        print('obj detector type', type(object_detector))
         detections = object_detector.detect_raw(input_frame)
+        #print("Detections:", detections)
         duration = datetime.datetime.now().timestamp() - start.value
         frame_manager.close(connection_id)
         outputs[connection_id]["np"][:] = detections[:]

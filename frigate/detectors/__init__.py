@@ -15,4 +15,6 @@ def create_detector(detector_config):
     api = api_types.get(detector_config.type)
     if not api:
         raise ValueError(detector_config.type)
-    return api(detector_config)
+    object_detector = api(detector_config)
+    #print("Detector API class:", type(object_detector.detect_api))
+    return object_detector

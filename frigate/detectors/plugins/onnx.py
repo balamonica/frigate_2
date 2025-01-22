@@ -118,12 +118,13 @@ class ONNXDetector(DetectionApi):
             return yolov8_postprocess(model_input_shape, tensor_output)
         
         elif self.onnx_model_type == ModelTypeEnum.yolov11_humanattr:
+            print("Reached onnx.py yolovv11_humanattr") #for debug
             model_input_shape = self.model.get_inputs()[0].shape
             print("Reached onnx.py yolov11_humanattr") 
             tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
             tensor_output = self.model.run(None, {model_input_name: tensor_input})[0]
             detections = yolov8_postprocess(model_input_shape, tensor_output) 
-            
+            print("Completed yolov11 detection") #for debug
             # Filter person detections first
             person_detections = [d for d in detections if d[0] == 1]  # class_id == 1 for person
             if not person_detections:
@@ -132,6 +133,7 @@ class ONNXDetector(DetectionApi):
             # Prepare batch of crops
             batch_crops = []
             for detection in person_detections:
+                print("Reached human_attr") #for debug
                 _, _, y_min, x_min, y_max, x_max = detection
                 crop = tensor_input[0, :, 
                                   int(y_min * self.h):int(y_max * self.h), 

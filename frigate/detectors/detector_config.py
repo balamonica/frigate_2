@@ -70,8 +70,8 @@ class ModelConfig(BaseModel):
     )
     human_attr_model_path: Optional[str] = Field(None, title="Human Attribute Detection model path.")
     human_attr_labelmap_path: Optional[str] = Field(None, title="Label map for human attribute detector.")
-    human_attr_width: int = Field(default=320, title="Human Attribute Detection model input width.")
-    human_attr_height: int = Field(default=320, title="Human Attribute Detection model input height.")
+    human_attr_width: int = Field(default=192, title="Human Attribute Detection model input width.")
+    human_attr_height: int = Field(default=256, title="Human Attribute Detection model input height.")
 
     _merged_labelmap: Optional[Dict[int, str]] = PrivateAttr()
     _colormap: Dict[int, Tuple[int, int, int]] = PrivateAttr()
