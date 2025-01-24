@@ -11,25 +11,51 @@ from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig, ModelTypeEnum
 from frigate.detectors.util import preprocess, yolov8_postprocess
 import cv2
-
+image_counter = 0
 logger = logging.getLogger(__name__)
 
 DETECTOR_KEY = "openvino"
 
-def write_attributes_to_csv(detected_attributes, output_file="human_attributes.csv"):
-    # Define the output path
-    output_path = os.path.join("/media/frigate", output_file)
+def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
+    global image_counter  # Use the global counter for naming images
 
-    # Create a DataFrame from the detected attributes
-    df = pd.DataFrame([{
-        "bbox": attr["bbox"],
-        "attributes": attr["attributes"],
-        "label": attr.get("label", "Unknown")  # Add label if available
-    } for attr in detected_attributes])
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Prepare a list to hold the data for the DataFrame
+    data = []
+
+    # Create a filename for the cropped image
+    cropped_image_filename = f"image{image_counter}.jpg"
+    cropped_image_path = os.path.join(output_dir, cropped_image_filename)
+
+    # Save the cropped image
+    cv2.imwrite(cropped_image_path, crop)
+
+    # Append the data for this detection
+    data = {
+        "Image Name": cropped_image_filename,
+        "Detected Labels": [detected_labels],  # Store as a list
+        "Confidence Intervals": [confidence_intervals],  # Store as a list
+        "Bounding Box": [bounding_boxes]  # Store as a list
+    }
+
+    # Create a DataFrame from the collected data
+    df = pd.DataFrame(data)
 
     # Write the DataFrame to a CSV file
-    df.to_csv(output_path, index=False)
-    print(f"Attributes written to {output_path}")
+    csv_output_path = os.path.join("/media/frigate", output_file)
+
+    # Check if the file exists to determine if we need to write the header
+    if not os.path.isfile(csv_output_path):
+        df.to_csv(csv_output_path, index=False)  # Write header if file does not exist
+    else:
+        df.to_csv(csv_output_path, mode='a', header=False, index=False)  # Append without header
+
+    print(f"Attributes written to {csv_output_path}")
+
+    # Increment the image counter for the next call
+    image_counter += 1
 
 def load_labels(labelmap_path):
     with open(labelmap_path, 'r') as f:
@@ -176,12 +202,16 @@ class OvDetector(DetectionApi):
 
     def detect_raw(self, tensor_input):
         infer_request = self.interpreter.create_infer_request()
+        #print("Size of tensor_input:", tensor_input.shape)  # Add this line to print the size
+
         # TODO: see if we can use shared_memory=True
         if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11, ModelTypeEnum.yolov11_humanattr):
             # Get the model input shape
             model_input_shape = self.interpreter.inputs[0].shape  # Get the input shape from the interpreter
             # Preprocess the input tensor
+
             input_tensor = preprocess(tensor_input, model_input_shape, np.float32)
+            #input_tensor = preprocess(tensor_input, model_input_shape, np.float32)
         else:
             input_tensor = ov.Tensor(array=tensor_input)
         #followingline commented by monica
@@ -264,6 +294,8 @@ class OvDetector(DetectionApi):
         # Add the YOLOv8 output processing here
         if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
             #print("Reached YOLOv8 model processing")
+            print("Size of tensor_input:", tensor_input.shape)  # Add this line to print the size
+
             out_tensor = infer_request.get_output_tensor()
             results = out_tensor.data[0]
             output_data = np.transpose(results)
@@ -308,94 +340,94 @@ class OvDetector(DetectionApi):
                 )
             return detections
         elif self.ov_model_type in (ModelTypeEnum.yolov11_humanattr):
-            print("Reached openvino.py yolov11_humanattr")  # for debug
-            model_input_shape = self.interpreter.inputs[0].shape
-            print("Model input shape:", model_input_shape)  # for debug
+            print("Size of tensor_input:", tensor_input.shape)  # Add this line to print the size
+
+            #model_input_shape = self.interpreter.inputs[0].shape
+            #   print("Model input shape:", model_input_shape)  # for debug
 
             # Extract human attribute model parameters from detector_config
             human_attr_model_path = self.detector_config.model.human_attr_model_path
             human_attr_labelmap_path = self.detector_config.model.human_attr_labelmap_path
             human_attr_width = self.detector_config.model.human_attr_width
             human_attr_height = self.detector_config.model.human_attr_height
+            
+            out_tensor = infer_request.get_output_tensor()
+            results = out_tensor.data[0]
+            output_data = np.transpose(results)
+            scores = np.max(output_data[:, 4:], axis=1)
 
+            if len(scores) == 0:
+                return np.zeros((20, 6), np.float32)
+            scores = np.expand_dims(scores, axis=1)
+            # add scores to the last column
+            dets = np.concatenate((output_data, scores), axis=1)
+            # filter out lines with scores below threshold
+            dets = dets[dets[:, -1] > 0.8, :]
+            # limit to top 20 scores, descending order
+            ordered = dets[dets[:, -1].argsort()[::-1]][:20]
+            detections = np.zeros((20, 6), np.float32)
 
-            # Preprocess the input tensor
-            tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
-            print("preprocess in yolovll human attr done:")  # for debug
-            # Create an infer request
-            infer_request = self.interpreter.create_infer_request()
+            for i, object_detected in enumerate(ordered):
+                detections[i] = self.process_yolo(
+                    np.argmax(object_detected[4:-1]),
+                    object_detected[-1],
+                    object_detected[:4],
+                )
 
-            # Convert the input numpy array to an OpenVINO Tensor
-            tensor_input = ov.Tensor(tensor_input)
-
-            # Set the input tensor for the infer request
-            infer_request.set_input_tensor(tensor_input)
-
-            # Perform inference
-            infer_request.infer()
-
-            # Get the output tensor
-            tensor_output = infer_request.get_output_tensor(0).data
-
+            #return detections
             # Process the output tensor
-            detections = yolov8_postprocess(model_input_shape, tensor_output)
             print("Completed yolov11 detection")  # for debug
-
             # Filter person detections first
-            person_detections = [d for d in detections if d[0] == 2]  # class_id == 1 for person
+            person_detections = [d for d in detections if d[0] == 0]  # class_id == 1 for person
             if not person_detections:
                 return detections
 
             # Prepare batch of crops for human attribute detection
-            batch_crops = []
+            
             for detection in person_detections:
                 print("Reached human_attr")  # for debug
-                print("base detector conig in human attr", BaseDetectorConfig)
                 self.human_attr_model = ov.Core().compile_model(human_attr_model_path, "CPU")
                 # Load the human attribute labels
                 human_attr_labels = load_labels(human_attr_labelmap_path)
 
                 _, _, y_min, x_min, y_max, x_max = detection
                 # Convert tensor_input to a NumPy array for indexing
-                tensor_input_np = tensor_input.data  # Convert to NumPy array
+                tensor_input_np = np.array(tensor_input.data)  # Convert to NumPy array
+                #print("Shape of tensor_input_np:", tensor_input_np.shape)  # Debugging line
+                # Access the first image in the batch
+                image_to_save = tensor_input_np[0]
+                #batch_crops = []
+                # Crop the image using the bounding box coordinates
+                crop = image_to_save[int(y_min * 640):int(y_max * 640), int(x_min * 640):int(x_max * 640)]
 
-                
-                # Crop the bounding box from the input tensor
-                crop = tensor_input_np[0, :, 
-                                    int(y_min * self.h):int(y_max * self.h), 
-                                    int(x_min * self.w):int(x_max * self.w)]
-                
-                # Resize and preprocess the crop for human attribute detection
-                resized_crop = cv2.resize(crop.transpose(1, 2, 0), (human_attr_width, human_attr_height))
-                processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
-                batch_crops.append(processed_crop)
+                    # Check if the crop is valid (not empty)
 
-            # Stack all crops into a single batch
-            if batch_crops:
-                batch_input = np.stack(batch_crops, axis=0)
-                # Create an infer request
+                    # Resize the cropped image to the required dimensions for the model
+                resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
+
+                # Preprocess the resized image for the model (CHW format and normalization)
+                processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0  # Convert to CHW format and normalize
+                processed_crop = np.expand_dims(processed_crop, axis=0)
+                # Append the processed crop to the list
+                #batch_crops.append(processed_crop)
                 infer_request = self.human_attr_model.create_infer_request()
                 # Set the input tensor for the infer request
-                infer_request.set_input_tensor(ov.Tensor(batch_input))
+                infer_request.set_input_tensor(ov.Tensor(processed_crop))
 
                 # Perform inference
                 infer_request.infer()
-
-                # Get the output tensor
-                batch_attributes = infer_request.get_output_tensor(0).data
- 
-                # Store results
-                detected_attributes = []
-                for i, detection in enumerate(person_detections):
-                    _, _, y_min, x_min, y_max, x_max = detection
-                    detected_attributes.append({
-                        "bbox": [x_min, y_min, x_max, y_max],
-                        "attributes": batch_attributes[i],
-                        "label": human_attr_labels[i] if i < len(human_attr_labels) else "Unknown"  # Add label
-                    })
-                
-                # Write detected attributes to an Excel sheet
-                write_attributes_to_csv(detected_attributes)
-
+                image_attr= infer_request.get_output_tensor(0).data
+                #print('image_attr', image_attr)
+                detected_labels = []
+                confidence_intervals = []
+                bounding_boxes= ([x_min, y_min, x_max, y_max]) 
+                scores = image_attr.flatten()
+                for i, score in enumerate(scores):
+                    if score > 0.5:
+                        detected_labels.append(human_attr_labels[i])
+                        confidence_intervals.append(score)
+                         
+                        
+                save_cropped_images_and_write_csv(crop,detected_labels,confidence_intervals,bounding_boxes)
             return detections
  
