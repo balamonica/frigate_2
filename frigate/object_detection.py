@@ -144,8 +144,8 @@ def run_detector(
 
         # detect and send the output
         start.value = datetime.datetime.now().timestamp()
-        print('in object_detector')
-        print('obj detector type', type(object_detector))
+        #print('in object_detector')
+        #print('obj detector type', type(object_detector))
         detections = object_detector.detect_raw(input_frame)
         #print("Detections:", detections)
         duration = datetime.datetime.now().timestamp() - start.value

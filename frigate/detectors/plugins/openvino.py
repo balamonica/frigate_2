@@ -382,8 +382,8 @@ class OvDetector(DetectionApi):
             if not person_detections:
                 return detections
 
-            # Prepare batch of crops for human attribute detection
-            
+            processed_object_ids = set()
+
             for detection in person_detections:
                 print("Reached human_attr")  # for debug
                 self.human_attr_model = ov.Core().compile_model(human_attr_model_path, "CPU")
@@ -391,43 +391,48 @@ class OvDetector(DetectionApi):
                 human_attr_labels = load_labels(human_attr_labelmap_path)
 
                 _, _, y_min, x_min, y_max, x_max = detection
+                object_id = detection[0]  # Assuming the first element is a unique ID for the object
+
+                # Check if the object has already been processed
+                if object_id in processed_object_ids:
+                    print(f"Skipping detection for object ID {object_id} as it has already been processed.")
+                    continue  # Skip to the next detection
+
                 # Convert tensor_input to a NumPy array for indexing
                 tensor_input_np = np.array(tensor_input.data)  # Convert to NumPy array
-                #print("Shape of tensor_input_np:", tensor_input_np.shape)  # Debugging line
                 # Access the first image in the batch
                 image_to_save = tensor_input_np[0]
-                #batch_crops = []
                 # Crop the image using the bounding box coordinates
                 crop = image_to_save[int(y_min * 640):int(y_max * 640), int(x_min * 640):int(x_max * 640)]
 
-                    # Check if the crop is valid (not empty)
-
-                    # Resize the cropped image to the required dimensions for the model
+                # Resize the cropped image to the required dimensions for the model
                 resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
 
                 # Preprocess the resized image for the model (CHW format and normalization)
                 processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0  # Convert to CHW format and normalize
                 processed_crop = np.expand_dims(processed_crop, axis=0)
-                # Append the processed crop to the list
-                #batch_crops.append(processed_crop)
+
                 infer_request = self.human_attr_model.create_infer_request()
                 # Set the input tensor for the infer request
                 infer_request.set_input_tensor(ov.Tensor(processed_crop))
 
                 # Perform inference
                 infer_request.infer()
-                image_attr= infer_request.get_output_tensor(0).data
-                #print('image_attr', image_attr)
+                image_attr = infer_request.get_output_tensor(0).data
+
                 detected_labels = []
                 confidence_intervals = []
-                bounding_boxes= ([x_min, y_min, x_max, y_max]) 
+                bounding_boxes = ([x_min, y_min, x_max, y_max]) 
                 scores = image_attr.flatten()
                 for i, score in enumerate(scores):
                     if score > 0.5:
                         detected_labels.append(human_attr_labels[i])
                         confidence_intervals.append(score)
-                         
-                        
-                save_cropped_images_and_write_csv(crop,detected_labels,confidence_intervals,bounding_boxes)
+
+                # Save the processed object ID to the set
+                processed_object_ids.add(object_id)
+
+                save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes)
+
             return detections
  
