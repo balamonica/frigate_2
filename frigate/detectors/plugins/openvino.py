@@ -10,6 +10,7 @@ import pandas as pd
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig, ModelTypeEnum
 from frigate.detectors.util import preprocess, yolov8_postprocess
+from frigate.util.image import draw_box_with_label
 import cv2
 image_counter = 0
 logger = logging.getLogger(__name__)
@@ -350,7 +351,8 @@ class OvDetector(DetectionApi):
             human_attr_labelmap_path = self.detector_config.model.human_attr_labelmap_path
             human_attr_width = self.detector_config.model.human_attr_width
             human_attr_height = self.detector_config.model.human_attr_height
-            
+            human_attr_show_label= self.detector_config.model.human_attr_show_label
+
             out_tensor = infer_request.get_output_tensor()
             results = out_tensor.data[0]
             output_data = np.transpose(results)
@@ -431,6 +433,20 @@ class OvDetector(DetectionApi):
 
                 # Save the processed object ID to the set
                 processed_object_ids.add(object_id)
+                if human_attr_show_label:
+                    print(x_min,y_min,x_max,y_max)
+                    draw_box_with_label(
+                        tensor_input,
+                        int(x_min * 640),
+                        int(y_min * 640),
+                        int(x_max * 640),
+                        int(y_max * 640),
+                        label=detected_labels,  # Pass the attribute label string
+                        info="",  # Additional info if needed
+                        thickness=2,
+                        color=(0, 255, 0),  # Green color for the box
+                        position="ul"  # Position of the label (upper left)
+                    )            
 
                 save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes)
 
