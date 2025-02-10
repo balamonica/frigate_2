@@ -12,8 +12,7 @@ from frigate.detectors.detector_config import (
     BaseDetectorConfig,
     ModelTypeEnum,
 )
-from frigate.util.model import get_ort_providers
-from frigate.detectors.util import preprocess, yolov8_postprocess
+from frigate.util.model import get_ort_providers, post_process_yolov9
 
 logger = logging.getLogger(__name__)
 
@@ -106,64 +105,8 @@ class ONNXDetector(DetectionApi):
                     x_max / self.w,
                 ]
             return detections
-        elif self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
-            model_input_shape = self.model.get_inputs()[0].shape
-            
-            #print("Reached onnx.py yolov8") #for debug
- 
-            tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
-
-            tensor_output = self.model.run(None, {model_input_name: tensor_input})[0]
-
-            return yolov8_postprocess(model_input_shape, tensor_output)
-        
-        elif self.onnx_model_type == ModelTypeEnum.yolov11_humanattr:
-            print("Reached onnx.py yolovv11_humanattr") #for debug
-            model_input_shape = self.model.get_inputs()[0].shape
-            print("Reached onnx.py yolov11_humanattr") 
-            tensor_input = preprocess(tensor_input, model_input_shape, np.float32)
-            tensor_output = self.model.run(None, {model_input_name: tensor_input})[0]
-            detections = yolov8_postprocess(model_input_shape, tensor_output) 
-            print("Completed yolov11 detection") #for debug
-            # Filter person detections first
-            person_detections = [d for d in detections if d[0] == 1]  # class_id == 1 for person
-            if not person_detections:
-                return detections
-                
-            # Prepare batch of crops
-            batch_crops = []
-            for detection in person_detections:
-                print("Reached human_attr") #for debug
-                _, _, y_min, x_min, y_max, x_max = detection
-                crop = tensor_input[0, :, 
-                                  int(y_min * self.h):int(y_max * self.h), 
-                                  int(x_min * self.w):int(x_max * self.w)]
-                
-                # Resize and preprocess
-                resized_crop = cv2.resize(crop.transpose(1, 2, 0), (192, 256))
-                processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
-                batch_crops.append(processed_crop)
-            
-            # Stack all crops into a single batch
-            if batch_crops:
-                batch_input = np.stack(batch_crops, axis=0)
-                
-                # Run human attribute detection on entire batch
-                batch_attributes = self.human_attr_model.run(None, 
-                    {self.human_attr_model.get_inputs()[0].name: batch_input})[0]
-                
-                # Store results
-                detected_attributes = []
-                for i, detection in enumerate(person_detections):
-                    _, _, y_min, x_min, y_max, x_max = detection
-                    detected_attributes.append({
-                        "bbox": [x_min, y_min, x_max, y_max],
-                        "attributes": batch_attributes[i]
-                    })
-                
-                write_attributes_to_excel(detected_attributes)
-            
-            return detections
-
+        elif self.onnx_model_type == ModelTypeEnum.yolov9:
+            predictions: np.ndarray = tensor_output[0]
+            return post_process_yolov9(predictions, self.w, self.h)
         else:
             tensor_output = self.model.run(None, {model_input_name: tensor_input})

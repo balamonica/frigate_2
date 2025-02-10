@@ -35,6 +35,7 @@ class InputDTypeEnum(str, Enum):
 class ModelTypeEnum(str, Enum):
     ssd = "ssd"
     yolox = "yolox"
+    yolov9 = "yolov9"
     yolonas = "yolonas"
     yolov5 = "yolov5"
     yolov8 = "yolov8"
