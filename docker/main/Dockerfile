@@ -182,8 +182,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,source=docker/main/requirements-wheels.txt,target=/requirements-wheels.txt \
     pip3 wheel --wheel-dir=/wheels -r /requirements-wheels.txt
 
-# Add ByteTrack installation here
-#RUN pip3 install bytetracker
+# Install HailoRT & Wheels
+RUN --mount=type=bind,source=docker/main/install_hailort.sh,target=/deps/install_hailort.sh \
+    /deps/install_hailort.sh
 
 # Collect deps in a single layer
 FROM scratch AS deps-rootfs
@@ -194,6 +195,7 @@ COPY --from=libusb-build /usr/local/lib /usr/local/lib
 COPY --from=tempio /rootfs/ /
 COPY --from=s6-overlay /rootfs/ /
 COPY --from=models /rootfs/ /
+COPY --from=wheels /rootfs/ /
 COPY docker/main/rootfs/ /
 
 
