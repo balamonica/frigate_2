@@ -119,8 +119,8 @@ COPY labelmap.txt .
 # Copy OpenVino model
 COPY --from=ov-converter /models/ssdlite_mobilenet_v2.xml openvino-model/
 COPY --from=ov-converter /models/ssdlite_mobilenet_v2.bin openvino-model/
-RUN wget -q https://github.com/openvinotoolkit/open_model_zoo/blob/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt && \
-    sed -i 's/truck/car/g' openvino-model/coco_91cl_bkgr.txt
+RUN wget -q https://github.com/openvinotoolkit/open_model_zoo/blob/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt
+RUN sed -i 's/truck/car/g' openvino-model/coco_91cl_bkgr.txt
 # Get Audio Model and labels
 RUN wget -qO - https://www.kaggle.com/api/v1/models/google/yamnet/tfLite/classification-tflite/1/download | tar xvz && mv 1.tflite cpu_audio_model.tflite
 COPY audio-labelmap.txt .
@@ -170,16 +170,30 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
 RUN wget -q https://bootstrap.pypa.io/get-pip.py -O get-pip.py \
     && python3 get-pip.py "pip"
 
-COPY docker/main/requirements.txt /requirements.txt
-RUN pip3 install -r /requirements.txt
+# Install build dependencies for lap
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    gfortran \
+    libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Build pysqlite3 from source
-COPY docker/main/build_pysqlite3.sh /build_pysqlite3.sh
-RUN /build_pysqlite3.sh
+# Use cache mount for pip cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install "setuptools<60.0" "numpy<1.23.0" Cython wheel
 
-COPY docker/main/requirements-wheels.txt /requirements-wheels.txt
-RUN pip3 wheel --wheel-dir=/wheels -r /requirements-wheels.txt
+# Use cache mount for pip installations
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=docker/main/requirements.txt,target=/requirements.txt \
+    pip3 install -r /requirements.txt
 
+# Use cache mount for wheel building
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=docker/main/requirements-wheels.txt,target=/requirements-wheels.txt \
+    pip3 wheel --wheel-dir=/wheels -r /requirements-wheels.txt
+
+# Add ByteTrack installation here
+#RUN pip3 install bytetracker
 
 # Collect deps in a single layer
 FROM scratch AS deps-rootfs
