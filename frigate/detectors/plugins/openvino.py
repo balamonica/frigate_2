@@ -155,6 +155,10 @@ class OvDetector(DetectionApi):
         self.tracked_objects = {}  # This can be managed by the tracker
         self.processed_object_ids = set()
 
+        #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
+        self.tracked_objects = {}  # This can be managed by the tracker
+        self.processed_object_ids = set()
+
         # Initialize vehicle attribute model parameters
         self.vehicle_attr_enabled = detector_config.model.vehicle_attr
         if self.vehicle_attr_enabled:
