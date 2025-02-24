@@ -41,6 +41,7 @@ class ModelTypeEnum(str, Enum):
     yolov8 = "yolov8"
     yolov11 = "yolov11"
     yolov11_humanattr="yolov11_humanattr"
+    dfine = "dfine"
 
 
 class ModelConfig(BaseModel):
