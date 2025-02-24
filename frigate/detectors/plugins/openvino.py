@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import time
 
 import numpy as np
 import openvino as ov
@@ -10,23 +11,40 @@ from typing_extensions import Literal
 import pandas as pd
 #from frigate.track.centroid_tracker import CentroidTracker  # Import the CentroidTracker
 
+#from frigate.track.centroid_tracker import CentroidTracker  # Import the CentroidTracker
+
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig, ModelTypeEnum
 from frigate.detectors.util import preprocess, yolov8_postprocess
 from frigate.util.image import draw_box_with_label
 import cv2
+#from frigate.track import ObjectTracker
+#from frigate.track import ObjectTracker
+#from bytetrack import BYTETracker
+#from frigate.track.centroid_tracker import CentroidTracker
+#from frigate.track.centroid_tracker import CentroidTracker
 image_counter = 0
+#tracked_objects = {}
+#next_id = 0
+#tracked_objects = {}
+#next_id = 0
 logger = logging.getLogger(__name__)
 
 DETECTOR_KEY = "openvino"
 
+def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
 def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
     # Convert the image to BGR format
     crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
+    # Convert the image to BGR format
+    crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
 
+    # Create a filename with both timestamp and frame number
+    timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
+    cropped_image_filename = f"frame_{frame_number}_time_{timestamp}.jpg"
     # Create a filename with both timestamp and frame number
     timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
     cropped_image_filename = f"frame_{frame_number}_time_{timestamp}.jpg"
@@ -34,10 +52,15 @@ def save_cropped_images_and_write_csv(crop, detected_labels, confidence_interval
 
     # Save the cropped image in BGR format
     cv2.imwrite(cropped_image_path, crop_bgr)
+    # Save the cropped image in BGR format
+    cv2.imwrite(cropped_image_path, crop_bgr)
 
+    # Prepare the data for the DataFrame
     # Prepare the data for the DataFrame
     data = {
         "Image Name": cropped_image_filename,
+        "Frame Number": frame_number,  # Add frame number
+        "Frame Time": frame_time,  # Add frame time - added comma
         "Frame Number": frame_number,  # Add frame number
         "Frame Time": frame_time,  # Add frame time - added comma
         "Detected Labels": [detected_labels],  # Store as a list
@@ -57,6 +80,7 @@ def save_cropped_images_and_write_csv(crop, detected_labels, confidence_interval
     else:
         df.to_csv(csv_output_path, mode='a', header=False, index=False)  # Append without header
 
+    #print(f"Attributes written to {csv_output_path}")
     #print(f"Attributes written to {csv_output_path}")
 
 def load_labels(labelmap_path):
@@ -92,38 +116,16 @@ class OvDetector(DetectionApi):
         self.ov_core = ov.Core()
         self.ov_model_type = detector_config.model.model_type
         self.next_id = 0 
-        self.detector_config = detector_config
-        self.frame_counter = 0
-        
-        # Initialize human attribute model parameters
-        self.human_attr_enabled = detector_config.model.human_attr
-        if self.human_attr_enabled:
-            if not detector_config.model.human_attr_model_path:
-                logger.error("Human attribute model path not specified")
-                raise ValueError("human_attr_model_path is required when human_attr is enabled")
-            if not detector_config.model.human_attr_labelmap_path:
-                logger.error("Human attribute labelmap path not specified")
-                raise ValueError("human_attr_labelmap_path is required when human_attr is enabled")
-            self.human_attr_model = None  # Will be initialized when needed
-        
+        self.detector_config = detector_config  # Store the detector_config as an instance variable
+        self.human_attr_model = None  # Initialize the human attribute model variable
+        self.frame_counter = 0  # Add frame counter
+ 
         self.h = detector_config.model.height
         self.w = detector_config.model.width
 
         #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
         self.tracked_objects = {}  # This can be managed by the tracker
         self.processed_object_ids = set()
-
-        # Initialize vehicle attribute model parameters
-        self.vehicle_attr_enabled = detector_config.model.vehicle_attr
-        if self.vehicle_attr_enabled:
-            if not detector_config.model.vehicle_attr_model_path:
-                logger.error("Vehicle attribute model path not specified")
-                raise ValueError("vehicle_attr_model_path is required when vehicle_attr is enabled")
-            if not detector_config.model.vehicle_attr_labelmap_path:
-                logger.error("Vehicle attribute labelmap path not specified")
-                raise ValueError("vehicle_attr_labelmap_path is required when vehicle_attr is enabled")
-            self.vehicle_attr_model = None  # Will be initialized when needed
-            self.processed_vehicle_ids = set()
 
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
@@ -243,6 +245,40 @@ class OvDetector(DetectionApi):
             (pos[1] + (pos[3] / 2)) / self.h,  # y_max
             (pos[0] + (pos[2] / 2)) / self.w,  # x_max
         ]
+
+    def assign_tracking_ids(self, formatted_detections):
+        current_frame_ids = {}
+        
+        for detection in formatted_detections:
+            box = detection["box"]
+            center_x = (box[1] + box[3]) / 2
+            center_y = (box[0] + box[2]) / 2
+            detection_id = None
+
+            for obj_id, obj in self.tracked_objects.items():
+                obj_box = obj["box"]
+                obj_center_x = (obj_box[1] + obj_box[3]) / 2
+                obj_center_y = (obj_box[0] + obj_box[2]) / 2
+                distance = np.sqrt((center_x - obj_center_x) ** 2 + (center_y - obj_center_y) ** 2)
+
+                # Increase distance threshold to better match same person
+                if distance < 0.1:  # Changed from 0.003 to 0.1
+                    detection_id = obj_id
+                    self.tracked_objects[obj_id]["box"] = box
+                    break
+
+            if detection_id is None:
+                detection_id = self.next_id
+                self.next_id += 1
+
+            current_frame_ids[detection_id] = {
+                "box": box,
+                "label": detection["label"],
+                "score": detection["score"],
+                # "frame_time": detection["frame_time"]
+            }
+
+        return current_frame_ids
 
     def assign_tracking_ids(self, formatted_detections):
         current_frame_ids = {}
@@ -595,4 +631,171 @@ class OvDetector(DetectionApi):
                     object_detected[:4],
                 )
             return detections
-        
+        elif self.ov_model_type in (ModelTypeEnum.yolov11_humanattr):
+            # Increment frame counter
+            self.frame_counter += 1
+            current_time = time.time()
+
+            # YOLOv11 detection
+            #tracker = NorfairTracker(self.detector_config, None)
+
+            # Extract human attribute model parameters from detector_config
+            human_attr_model_path = self.detector_config.model.human_attr_model_path
+            human_attr_labelmap_path = self.detector_config.model.human_attr_labelmap_path
+            human_attr_width = self.detector_config.model.human_attr_width
+            human_attr_height = self.detector_config.model.human_attr_height
+            human_attr_show_label = self.detector_config.model.human_attr_show_label
+
+            out_tensor = infer_request.get_output_tensor()
+            results = out_tensor.data[0]
+            output_data = np.transpose(results)
+            scores = np.max(output_data[:, 4:], axis=1)
+
+            if len(scores) == 0:
+                return np.zeros((20, 6), np.float32)
+            scores = np.expand_dims(scores, axis=1)
+            dets = np.concatenate((output_data, scores), axis=1)
+
+            dets = dets[dets[:, -1] > 0.7, :]
+            ordered = dets[dets[:, -1].argsort()[::-1]][:20]
+            detections = np.zeros((20, 6), np.float32)
+
+            formatted_detections = []
+            for i, object_detected in enumerate(ordered):
+                detections = self.process_yolo(
+                    np.argmax(object_detected[4:-1]),
+                    object_detected[-1],
+                    object_detected[:4],
+                )
+                formatted_detections.append({
+                    "label": detections[0],
+                    "score": float(detections[1]),
+                    "box": [
+                        float(detections[2]),
+                        float(detections[3]),
+                        float(detections[4]),
+                        float(detections[5])
+                    ],
+                    #"frame_time": time.time(),
+                    #"area": (detections[4] - detections[2]) * (detections[5] - detections[3]),
+                    #"ratio": (detections[5] - detections[3]) / (detections[4] - detections[2]),
+                })
+            #print('Formatted_detections: ', formatted_detections)
+            
+
+            current_frame_ids = self.assign_tracking_ids(formatted_detections)
+
+            self.tracked_objects.update(current_frame_ids)
+            #print('tracked_objects', self.tracked_objects)
+            #print('current_frame_ids', current_frame_ids)
+
+
+            person_detections = {k: v for k, v in self.tracked_objects.items() if v['label'] == 0}
+            print(f"Current frame number: {self.frame_counter}")  # Add this line
+            print('person_detections', person_detections)
+            #print('Processed ID: ', self.processed_object_ids)
+            if not person_detections:
+                return detections
+
+            # Clear processed IDs if we're starting a new frame
+            if self.frame_counter != getattr(self, 'last_frame', -1):
+                self.processed_object_ids.clear()
+                setattr(self, 'last_frame', self.frame_counter)
+
+            for object_id, detection in person_detections.items():
+                if object_id in self.processed_object_ids:
+                    continue
+
+                print("Reached human_attr")
+                y_min, x_min, y_max, x_max = detection["box"]
+
+                self.processed_object_ids.add(object_id)
+                tensor_input_np = np.array(tensor_input)
+                image_to_save = tensor_input_np[0]
+                crop = image_to_save[int(y_min * 640):int(y_max * 640), int(x_min * 640):int(x_max * 640)]
+                resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
+                processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
+                processed_crop = np.expand_dims(processed_crop, axis=0)
+
+                self.human_attr_model = ov.Core().compile_model(human_attr_model_path, "CPU")
+                human_attr_labels = load_labels(human_attr_labelmap_path)
+                
+                infer_request = self.human_attr_model.create_infer_request()
+                infer_request.set_input_tensor(ov.Tensor(processed_crop))
+                infer_request.infer()
+                image_attr = infer_request.get_output_tensor(0).data
+
+                detected_labels = []
+                confidence_intervals = []
+                bounding_boxes = [x_min, y_min, x_max, y_max]
+                scores = image_attr.flatten()
+                for i, score in enumerate(scores):
+                    if score > 0.5:
+                        detected_labels.append(human_attr_labels[i])
+                        confidence_intervals.append(score)
+
+                if human_attr_show_label:
+                    print(x_min, y_min, x_max, y_max)
+                    draw_box_with_label(
+                        tensor_input,
+                        int(x_min * 640),
+                        int(y_min * 640),
+                        int(x_max * 640),
+                        int(y_max * 640),
+                        label=detected_labels,
+                        info="",
+                        thickness=2,
+                        color=(0, 255, 0),
+                        position="ul"
+                    )
+
+                save_cropped_images_and_write_csv(
+                    crop, 
+                    detected_labels, 
+                    confidence_intervals, 
+                    bounding_boxes, 
+                    frame_number=self.frame_counter,
+                    frame_time=current_time
+                )
+
+            # After processing all detections, before returning
+            # Save the frame with all detections
+            frame_with_detections = np.array(tensor_input)  # Remove .data[0]
+            if len(frame_with_detections.shape) == 4:
+                frame_with_detections = frame_with_detections[0]  # Get first frame if batch
+            frame_with_detections = cv2.cvtColor(frame_with_detections, cv2.COLOR_RGB2BGR)  # Convert to BGR for saving
+            
+            # Draw all detections
+            for detection in formatted_detections:
+                y_min, x_min, y_max, x_max = detection["box"]
+                label = detection["label"]
+                score = detection["score"]
+                
+                # Draw rectangle
+                cv2.rectangle(
+                    frame_with_detections,
+                    (int(x_min * 640), int(y_min * 640)),
+                    (int(x_max * 640), int(y_max * 640)),
+                    (0, 255, 0),  # BGR color
+                    2  # thickness
+                )
+                
+                # Add text label
+                text = f"class {label}: {score:.2f}"
+                cv2.putText(
+                    frame_with_detections,
+                    text,
+                    (int(x_min * 640), int(y_min * 640) - 10),  # Position above box
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,  # font scale
+                    (0, 255, 0),  # BGR color
+                    2  # thickness
+                )
+                
+            # Save the frame
+            output_dir = "/media/frigate/debug_frames"
+            os.makedirs(output_dir, exist_ok=True)
+            frame_path = os.path.join(output_dir, f"frame_{self.frame_counter}.jpg")
+            cv2.imwrite(frame_path, frame_with_detections)
+
+            return detections
