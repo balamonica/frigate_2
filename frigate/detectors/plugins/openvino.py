@@ -416,8 +416,8 @@ class OvDetector(DetectionApi):
 
                 # Filter person detections (class 0) from formatted_detections
                 person_detections = [d for d in formatted_detections if d['label'] == 0]
-                #print(f"Current frame number: {self.frame_counter}")
-                #print('person_detections', person_detections)
+                print(f"Current frame number: {self.frame_counter}")
+                print('person_detections', person_detections)
 
                 for detection in person_detections:
                     print("Processing human attributes")
@@ -483,8 +483,8 @@ class OvDetector(DetectionApi):
 
                 # Filter vehicle detections (class 2 for car) from formatted_detections
                 vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
-                #print(f"Current frame number: {self.frame_counter}")
-                #print('vehicle_detections', vehicle_detections)
+                print(f"Current frame number: {self.frame_counter}")
+                print('vehicle_detections', vehicle_detections)
 
                 for detection in vehicle_detections:
                     print("Processing vehicle attributes")
@@ -505,7 +505,7 @@ class OvDetector(DetectionApi):
                     processed_crop = processed_crop.astype(np.float32) / 255.0
                     processed_crop = np.expand_dims(processed_crop, axis=0)  # Add batch dimension
 
-                    #print('vehicle path', vehicle_attr_model_path)
+                    print('vehicle path', vehicle_attr_model_path)
                     
                     # Initialize model if not already done
                     if self.vehicle_attr_model is None:
