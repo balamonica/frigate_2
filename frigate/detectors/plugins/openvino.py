@@ -137,6 +137,18 @@ class OvDetector(DetectionApi):
         self.tracked_objects = {}  # This can be managed by the tracker
         self.processed_object_ids = set()
 
+        # Initialize vehicle attribute model parameters
+        self.vehicle_attr_enabled = detector_config.model.vehicle_attr
+        if self.vehicle_attr_enabled:
+            if not detector_config.model.vehicle_attr_model_path:
+                logger.error("Vehicle attribute model path not specified")
+                raise ValueError("vehicle_attr_model_path is required when vehicle_attr is enabled")
+            if not detector_config.model.vehicle_attr_labelmap_path:
+                logger.error("Vehicle attribute labelmap path not specified")
+                raise ValueError("vehicle_attr_labelmap_path is required when vehicle_attr is enabled")
+            self.vehicle_attr_model = None  # Will be initialized when needed
+            self.processed_vehicle_ids = set()
+
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
             raise FileNotFoundError
@@ -731,77 +743,165 @@ class OvDetector(DetectionApi):
                 human_attr_height = self.detector_config.model.human_attr_height
                 human_attr_show_label = self.detector_config.model.human_attr_show_label
 
-                # Assign tracking IDs and update tracked objects
-                current_frame_ids = self.assign_tracking_ids(formatted_detections)
-                self.tracked_objects.update(current_frame_ids)
-
-                # Filter person detections (class 0)
-                person_detections = {k: v for k, v in self.tracked_objects.items() if v['label'] == 0}
+                # Filter person detections (class 0) from formatted_detections
+                person_detections = [d for d in formatted_detections if d['label'] == 0]
                 print(f"Current frame number: {self.frame_counter}")
                 print('person_detections', person_detections)
 
-                if person_detections:
-                    # Clear processed IDs for new frame
-                    if self.frame_counter != getattr(self, 'last_frame', -1):
-                        self.processed_object_ids.clear()
-                        setattr(self, 'last_frame', self.frame_counter)
+                for detection in person_detections:
+                    print("Processing human attributes")
+                    y_min, x_min, y_max, x_max = detection["box"]
+                    
+                    tensor_input_np = np.array(tensor_input)
+                    image_to_save = tensor_input_np[0]
+                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
+                                       int(x_min * 640):int(x_max * 640)]
+                    resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
+                    processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
+                    processed_crop = np.expand_dims(processed_crop, axis=0)
 
-                    # Process each person detection
-                    for object_id, detection in person_detections.items():
-                        if object_id in self.processed_object_ids:
-                            continue
-
-                        print("Reached human_attr")
-                        y_min, x_min, y_max, x_max = detection["box"]
-                        
-                        self.processed_object_ids.add(object_id)
-                        tensor_input_np = np.array(tensor_input)
-                        image_to_save = tensor_input_np[0]
-                        crop = image_to_save[int(y_min * 640):int(y_max * 640), int(x_min * 640):int(x_max * 640)]
-                        resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
-                        processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
-                        processed_crop = np.expand_dims(processed_crop, axis=0)
-
+                    if not hasattr(self, 'human_attr_model'):
                         self.human_attr_model = ov.Core().compile_model(human_attr_model_path, "CPU")
-                        human_attr_labels = load_labels(human_attr_labelmap_path)
-                        
-                        infer_request = self.human_attr_model.create_infer_request()
-                        infer_request.set_input_tensor(ov.Tensor(processed_crop))
-                        infer_request.infer()
-                        image_attr = infer_request.get_output_tensor(0).data
+                    human_attr_labels = load_labels(human_attr_labelmap_path)
+                    
+                    infer_request = self.human_attr_model.create_infer_request()
+                    infer_request.set_input_tensor(ov.Tensor(processed_crop))
+                    infer_request.infer()
+                    image_attr = infer_request.get_output_tensor(0).data
 
-                        detected_labels = []
-                        confidence_intervals = []
-                        bounding_boxes = [x_min, y_min, x_max, y_max]
-                        scores = image_attr.flatten()
-                        for i, score in enumerate(scores):
-                            if score > 0.5:
-                                detected_labels.append(human_attr_labels[i])
-                                confidence_intervals.append(score)
+                    detected_labels = []
+                    confidence_intervals = []
+                    bounding_boxes = [x_min, y_min, x_max, y_max]
+                    scores = image_attr.flatten()
+                    for i, score in enumerate(scores):
+                        if score > 0.5:
+                            detected_labels.append(human_attr_labels[i])
+                            confidence_intervals.append(score)
 
-                        if human_attr_show_label:
-                            print(x_min, y_min, x_max, y_max)
-                            draw_box_with_label(
-                                tensor_input,
-                                int(x_min * 640),
-                                int(y_min * 640),
-                                int(x_max * 640),
-                                int(y_max * 640),
-                                label=detected_labels,
-                                info="",
-                                thickness=2,
-                                color=(0, 255, 0),
-                                position="ul"
-                            )
-
-                        save_cropped_images_and_write_csv(
-                            crop, 
-                            detected_labels, 
-                            confidence_intervals, 
-                            bounding_boxes, 
-                            frame_number=self.frame_counter,
-                            frame_time=current_time
+                    if human_attr_show_label:
+                        draw_box_with_label(
+                            tensor_input,
+                            int(x_min * 640),
+                            int(y_min * 640),
+                            int(x_max * 640),
+                            int(y_max * 640),
+                            label=detected_labels,
+                            info="",
+                            thickness=2,
+                            color=(0, 255, 0),
+                            position="ul"
                         )
+
+                    save_cropped_images_and_write_csv(
+                        crop, 
+                        detected_labels, 
+                        confidence_intervals, 
+                        bounding_boxes, 
+                        frame_number=self.frame_counter,
+                        frame_time=current_time
+                    )
+
+            # Process vehicle attributes if enabled
+            if self.vehicle_attr_enabled:
+                # Get vehicle attribute model parameters
+                vehicle_attr_model_path = self.detector_config.model.vehicle_attr_model_path
+                vehicle_attr_labelmap_path = self.detector_config.model.vehicle_attr_labelmap_path
+                vehicle_attr_width = self.detector_config.model.vehicle_attr_width
+                vehicle_attr_height = self.detector_config.model.vehicle_attr_height
+                vehicle_attr_show_label = self.detector_config.model.vehicle_attr_show_label
+
+                # Filter vehicle detections (class 2 for car) from formatted_detections
+                vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
+                print(f"Current frame number: {self.frame_counter}")
+                print('vehicle_detections', vehicle_detections)
+
+                for detection in vehicle_detections:
+                    print("Processing vehicle attributes")
+                    y_min, x_min, y_max, x_max = detection["box"]
+                    
+                    tensor_input_np = np.array(tensor_input)
+                    image_to_save = tensor_input_np[0]  # Already in RGB format
+                    
+                    # Crop the vehicle region
+                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
+                                       int(x_min * 640):int(x_max * 640)]
+                    
+                    # Resize to model's expected dimensions (192x256)
+                    resized_crop = cv2.resize(crop, (256, 192))  # width=256, height=192
+
+                    # Convert to NCHW format and normalize
+                    processed_crop = resized_crop.transpose(2, 0, 1)  # HWC to CHW
+                    processed_crop = processed_crop.astype(np.float32) / 255.0
+                    processed_crop = np.expand_dims(processed_crop, axis=0)  # Add batch dimension
+
+                    print('vehicle path', vehicle_attr_model_path)
+                    
+                    # Initialize model if not already done
+                    if self.vehicle_attr_model is None:
+                        try:
+                            print("Initializing vehicle attribute model...")
+                            self.vehicle_attr_model = ov.Core().compile_model(vehicle_attr_model_path, "CPU")
+                            print("Vehicle attribute model initialized successfully")
+                        except Exception as e:
+                            logger.error(f"Failed to initialize vehicle attribute model: {e}")
+                            continue
+                            
+                    vehicle_attr_labels = load_labels(vehicle_attr_labelmap_path)
+                    
+                    infer_request = self.vehicle_attr_model.create_infer_request()
+                    infer_request.set_input_tensor(ov.Tensor(processed_crop))
+                    infer_request.infer()
+                    vehicle_attr = infer_request.get_output_tensor(0).data
+
+                    scores = vehicle_attr.flatten()
+                    
+                    # First 10 labels are colors, next 9 are makes
+                    color_scores = scores[:10]
+                    make_scores = scores[10:19]
+                    
+                    detected_labels = []
+                    confidence_intervals = []
+                    
+                    # Get color with highest confidence above threshold
+                    max_color_idx = np.argmax(color_scores)
+                    max_color_score = color_scores[max_color_idx]
+                    if max_color_score > 0.5:
+                        detected_labels.append(vehicle_attr_labels[max_color_idx])
+                        confidence_intervals.append(float(max_color_score))
+                    
+                    # Get make with highest confidence above threshold
+                    max_make_idx = np.argmax(make_scores)
+                    max_make_score = make_scores[max_make_idx]
+                    if max_make_score > 0.5:
+                        detected_labels.append(vehicle_attr_labels[max_make_idx + 10])  # offset by 10 for make labels
+                        confidence_intervals.append(float(max_make_score))
+
+                    bounding_boxes = [x_min, y_min, x_max, y_max]
+
+                    if vehicle_attr_show_label:
+                        draw_box_with_label(
+                            tensor_input,
+                            int(x_min * 640),
+                            int(y_min * 640),
+                            int(x_max * 640),
+                            int(y_max * 640),
+                            label=detected_labels,
+                            info="",
+                            thickness=2,
+                            color=(255, 0, 0),
+                            position="ul"
+                        )
+
+                    save_cropped_images_and_write_csv(
+                        crop, 
+                        detected_labels, 
+                        confidence_intervals, 
+                        bounding_boxes, 
+                        frame_number=self.frame_counter,
+                        frame_time=current_time,
+                        output_dir="/media/frigate/vehicle_crops",
+                        output_file="vehicle_attributes.csv"
+                    )
 
             return detections
         elif self.ov_model_type == ModelTypeEnum.yolov5:
