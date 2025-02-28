@@ -509,8 +509,8 @@ class OvDetector(DetectionApi):
 
                 # Filter person detections (class 0) from formatted_detections
                 person_detections = [d for d in formatted_detections if d['label'] == 0]
-                print(f"Current frame number: {self.frame_counter}")
-                print('person_detections', person_detections)
+                #print(f"Current frame number: {self.frame_counter}")
+                #print('person_detections', person_detections)
 
                 for detection in person_detections:
                     print("Processing human attributes")
@@ -623,8 +623,8 @@ class OvDetector(DetectionApi):
 
                 # Filter vehicle detections (class 2 for car) from formatted_detections
                 vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
-                print(f"Current frame number: {self.frame_counter}")
-                print('vehicle_detections', vehicle_detections)
+                #print(f"Current frame number: {self.frame_counter}")
+                #print('vehicle_detections', vehicle_detections)
 
                 for detection in vehicle_detections:
                     print("Processing vehicle attributes")
