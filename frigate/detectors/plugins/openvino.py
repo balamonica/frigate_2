@@ -474,8 +474,8 @@ class OvDetector(DetectionApi):
 
                 # Filter person detections (class 0) from formatted_detections
                 person_detections = [d for d in formatted_detections if d['label'] == 0]
-                print(f"Current frame number: {self.frame_counter}")
-                print('person_detections', person_detections)
+                #print(f"Current frame number: {self.frame_counter}")
+                #print('person_detections', person_detections)
 
                 for detection in person_detections:
                     print("Processing human attributes")
@@ -825,6 +825,7 @@ class OvDetector(DetectionApi):
                     # Crop the vehicle region
                     crop = image_to_save[int(y_min * 640):int(y_max * 640), 
                                        int(x_min * 640):int(x_max * 640)]
+                    crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
                     
                     # Resize to model's expected dimensions (192x256)
                     resized_crop = cv2.resize(crop, (256, 192))  # width=256, height=192
@@ -854,27 +855,26 @@ class OvDetector(DetectionApi):
                     vehicle_attr = infer_request.get_output_tensor(0).data
 
                     scores = vehicle_attr.flatten()
-                    
+                    #print('vehicle CI', scores)
                     # First 10 labels are colors, next 9 are makes
-                    color_scores = scores[:10]
-                    make_scores = scores[10:19]
+
+                    color_probs = scores[:10]
+                    color_idx = np.argmax(color_probs)
+                    color_score = color_probs[color_idx]
+                    
+                    type_probs = scores[10:]
+                    type_idx = np.argmax(type_probs)
+                    type_score = type_probs[type_idx]
+
                     
                     detected_labels = []
                     confidence_intervals = []
-                    
-                    # Get color with highest confidence above threshold
-                    max_color_idx = np.argmax(color_scores)
-                    max_color_score = color_scores[max_color_idx]
-                    if max_color_score > 0.5:
-                        detected_labels.append(vehicle_attr_labels[max_color_idx])
-                        confidence_intervals.append(float(max_color_score))
-                    
-                    # Get make with highest confidence above threshold
-                    max_make_idx = np.argmax(make_scores)
-                    max_make_score = make_scores[max_make_idx]
-                    if max_make_score > 0.5:
-                        detected_labels.append(vehicle_attr_labels[max_make_idx + 10])  # offset by 10 for make labels
-                        confidence_intervals.append(float(max_make_score))
+
+                    detected_labels.append(vehicle_attr_labels[color_idx])
+                    confidence_intervals.append(float(color_score))
+
+                    detected_labels.append(vehicle_attr_labels[type_idx+10])
+                    confidence_intervals.append(float(type_score))
 
                     bounding_boxes = [x_min, y_min, x_max, y_max]
 
