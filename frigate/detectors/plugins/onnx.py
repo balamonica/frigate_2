@@ -124,4 +124,6 @@ class ONNXDetector(DetectionApi):
             predictions: np.ndarray = tensor_output[0]
             return post_process_yolov9(predictions, self.w, self.h)
         else:
-            tensor_output = self.model.run(None, {model_input_name: tensor_input})
+            raise Exception(
+                f"{self.onnx_model_type} is currently not supported for onnx. See the docs for more info on supported models."
+            )
