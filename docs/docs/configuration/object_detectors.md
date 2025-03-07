@@ -259,7 +259,7 @@ Note that the labelmap uses a subset of the complete COCO label set that has onl
 
 #### YOLOv9
 
-[YOLOv9](https://github.com/MultimediaTechLab/YOLO) models are supported, but not included by default.
+[YOLOv9](https://github.com/WongKinYiu/yolov9) models are supported, but not included by default.
 
 :::tip
 
@@ -542,7 +542,7 @@ model:
 
 #### YOLOv9
 
-[YOLOv9](https://github.com/MultimediaTechLab/YOLO) models are supported, but not included by default.
+[YOLOv9](https://github.com/WongKinYiu/yolov9) models are supported, but not included by default.
 
 :::tip
 
