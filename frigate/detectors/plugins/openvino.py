@@ -13,7 +13,7 @@ import pandas as pd
 from frigate.const import MODEL_CACHE_DIR
 from frigate.detectors.detection_api import DetectionApi
 from frigate.detectors.detector_config import BaseDetectorConfig, ModelTypeEnum
-from frigate.util.model import post_process_yolov9
+from frigate.util.model import post_process_dfine, post_process_yolov9
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +258,7 @@ class OvDetector(DetectionApi):
         ModelTypeEnum.yolonas,
         ModelTypeEnum.yolov9,
         ModelTypeEnum.yolox,
+        ModelTypeEnum.dfine,
     ]
 
     def __init__(self, detector_config: OvDetectorConfig):
@@ -500,17 +501,23 @@ class OvDetector(DetectionApi):
         #print("Size of tensor_input:", tensor_input.shape)  # Add this line to print the size
 
         # TODO: see if we can use shared_memory=True
-        if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11, ModelTypeEnum.yolov11_humanattr):
-            # Get the model input shape
-            model_input_shape = self.interpreter.inputs[0].shape  # Get the input shape from the interpreter
-            # Preprocess the input tensor
+        input_tensor = ov.Tensor(array=tensor_input)
 
-            input_tensor = preprocess(tensor_input, model_input_shape, np.float32)
-            #input_tensor = preprocess(tensor_input, model_input_shape, np.float32)
-        else:
-            input_tensor = ov.Tensor(array=tensor_input)
-        #followingline commented by monica
-        infer_request.infer(input_tensor)    
+        if self.ov_model_type == ModelTypeEnum.dfine:
+            infer_request.set_tensor("images", input_tensor)
+            target_sizes_tensor = ov.Tensor(
+                np.array([[self.h, self.w]], dtype=np.int64)
+            )
+            infer_request.set_tensor("orig_target_sizes", target_sizes_tensor)
+            infer_request.infer()
+            tensor_output = (
+                infer_request.get_output_tensor(0).data,
+                infer_request.get_output_tensor(1).data,
+                infer_request.get_output_tensor(2).data,
+            )
+            return post_process_dfine(tensor_output, self.w, self.h)
+
+        infer_request.infer(input_tensor)
 
         detections = np.zeros((20, 6), np.float32)
 
