@@ -85,6 +85,16 @@ class ModelConfig(BaseModel):
     vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
     vehicle_attr_show_label: bool = Field(default=True, title="Show vehicle attribute labels in the UI.")
     
+   # Vehicle ALPR detection parameters
+    vehicle_alpr: bool = Field(default=False, title="Enable vehicle License plate detection")
+    vehicle_alpr_det_model_path: Optional[str] = Field(None, title="Vehicle ALPR Detection model path.")
+    vehicle_alpr_rec_model_path: Optional[str] = Field(None, title="Vehicle ALPR Recognition model path.")
+    vehicle_rec_labelmap_path: Optional[str] = Field(None, title="Label map for vehicle attribute detector.")
+    #vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
+    #vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
+    
+    
+
     _merged_labelmap: Optional[Dict[int, str]] = PrivateAttr()
     _colormap: Dict[int, Tuple[int, int, int]] = PrivateAttr()
     _all_attributes: list[str] = PrivateAttr()
@@ -129,6 +139,12 @@ class ModelConfig(BaseModel):
             self.vehicle_attr_width = config.get("vehicle_attr_width", 192)
             self.vehicle_attr_height = config.get("vehicle_attr_height", 256)
             self.vehicle_attr_show_label = config.get("vehicle_attr_show_label", True)
+
+            #Read the  vehile ALPR parameters
+            self.vehicle_alpr = config.get("vehicle_alpr", False)
+            self.vehicle_alpr_det_model_path = config.get("vehicle_alpr_det_model_path", None)
+            self.vehicle_alpr_rec_model_path = config.get("vehicle_alpr_rec_model_path", None)
+            self.vehicle_rec_labelmap_path = config.get("vehicle_rec_labelmap_path", None)
 
         self._merged_labelmap = {
             **load_labels(config.get("labelmap_path", "/labelmap.txt")),

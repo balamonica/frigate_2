@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 DETECTOR_KEY = "openvino"
 
 
+
 def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
@@ -84,6 +85,137 @@ def load_labels(labelmap_path):
     except Exception as e:
         logger.error(f"Failed to load labels from {labelmap_path}: {str(e)}")
         return []
+    
+def unclip(box, unclip_ratio):
+        """Unclips the bounding box using pyclipper."""
+        poly = box.tolist()
+        distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
+        offset = pyclipper.PyclipperOffset()
+        offset.AddPath(poly, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        expanded = np.array(offset.Execute(distance))
+        return expanded.reshape(-1, 2)
+
+def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_ratio=2.0):
+
+
+    bitmap = (feature_map > thresh).astype(np.uint8)
+    
+    dest_width, dest_height = 640, 640  
+    
+    # Initialize scores list
+    scores = []
+    contours, _ = cv2.findContours(bitmap, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    boxes = []
+    confidences = []
+
+    for contour in contours:
+        rect = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+
+        sside = max(cv2.contourArea(box), 1)
+        print(sside)
+        if sside < 3:
+            continue
+        
+        score = cv2.contourArea(box)
+        # print('score', score)
+
+        if score < box_thresh:
+            continue
+
+        unclipped_box = unclip(box, unclip_ratio)
+        
+        # Ensure the box has exactly 4 points
+        if len(unclipped_box) > 4:
+            # Get the bounding rectangle of the unclipped polygon
+            rect = cv2.minAreaRect(unclipped_box)
+            unclipped_box = cv2.boxPoints(rect)
+
+        #resize to original size
+        height, width = bitmap.shape
+        unclipped_box[:, 0] = np.clip(np.round(unclipped_box[:, 0] / width * dest_width), 0, 640)
+        unclipped_box[:, 1] = np.clip(np.round(unclipped_box[:, 1] / height * dest_height), 0, 640)
+
+        boxes.append(unclipped_box.astype(np.int16))
+        scores.append(score)
+
+    if not boxes:  # If no boxes were found
+        return np.array([], dtype=np.int16), []
+        
+    # Ensure all boxes have the same shape before creating array
+    boxes = [box[:4] if len(box) > 4 else box for box in boxes]  # Take only first 4 points if more exist
+    return np.array(boxes, dtype=np.int16), scores
+
+def order_points(pts):
+    """Orders the corner points of a rectangle in clockwise order."""
+    rect = np.zeros((4, 2), dtype="float32")
+
+    # The top-left point will have the smallest sum, whereas
+    # the bottom-right point will have the largest sum
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+
+    # Now, compute the difference between the points,
+    # the top-right point will have the smallest difference,
+    # whereas the bottom-left will have the largest difference
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+
+    return rect.astype("int")
+
+def decode_license_plate_ctc(rec_result, label_file):
+    """Decodes the recognition result using CTC principles."""
+
+    predicted_indices = np.argmax(rec_result, axis=3)  # Get predicted indices
+
+    # Load the label file
+    with open(label_file, 'r') as f:
+        labels = f.read().splitlines()
+
+    # Add the '<blank>' character to the labels (crucial for CTC)
+    labels = ['<blank>'] + labels
+    print('label',len(labels))
+
+    decoded_text = []
+    for batch_idx in range(predicted_indices.shape[0]):  # Iterate through batch (1)
+        current_text = ""
+        previous_char_index = -1  # Initialize to an invalid index
+
+        for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
+            for i in range(predicted_indices.shape[2]):  # Iterate through sequence length (40)
+                char_index = predicted_indices[batch_idx, feature_map_idx, i].item()
+
+                if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
+                    current_text += labels[char_index]
+
+                previous_char_index = char_index
+
+        decoded_text.append(current_text)
+
+    return decoded_text
+
+def load_character_dict(file_path):
+    with open(file_path, 'r') as f:
+            # Read all lines and strip whitespace
+        characters = [line.strip() for line in f.readlines()]
+    return characters
+
+def min_max_scale(feature_map):
+    """Scales the feature map to the range [0, 1] using Min-Max scaling."""
+    min_val = np.min(feature_map)
+    max_val = np.max(feature_map)
+
+    if max_val == min_val:
+        # Handle the case where all values are the same
+        return np.zeros_like(feature_map)
+
+    scaled_feature_map = (feature_map - min_val) / (max_val - min_val)
+    return scaled_feature_map
+
 
 class OvDetectorConfig(BaseDetectorConfig):
     type: Literal[DETECTOR_KEY]
@@ -138,6 +270,8 @@ class OvDetector(DetectionApi):
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
             raise FileNotFoundError
+
+        self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
 
         os.makedirs("/config/model_cache/openvino", exist_ok=True)
         self.ov_core.set_property({props.cache_dir: "/config/model_cache/openvino"})
@@ -596,6 +730,32 @@ class OvDetector(DetectionApi):
                         output_dir="/media/frigate/vehicle_crops",
                         output_file="vehicle_attributes.csv"
                     )
+            if self.vehicle_alpr_enabled:
+                vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
+                
+                for detection in vehicle_detections:
+                    
+                    y_min, x_min, y_max, x_max = detection["box"]
+                    
+                    tensor_input_np = np.array(tensor_input)
+                    image_to_save = tensor_input_np[0]  # Already in RGB format
+                    
+                    # Crop the vehicle region
+                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
+                                       int(x_min * 640):int(x_max * 640)]
+                    crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+
+                    save_cropped_images_and_write_csv(
+                        crop, 
+                        detected_labels, 
+                        confidence_intervals, 
+                        bounding_boxes, 
+                        frame_number=self.frame_counter,
+                        frame_time=current_time,
+                        output_dir="/media/frigate/vehicle_alpr_crops",
+                        output_file="vehicle_alpr.csv"
+                    )
+
             #print ('yolov11', detections)
             return detections
         elif self.ov_model_type == ModelTypeEnum.yolov5:
@@ -616,4 +776,82 @@ class OvDetector(DetectionApi):
                     object_detected[:4],
                 )
             return detections
-        
+    
+    def vehicle_alpr(self):
+        vehicle_alpr_det_model_path = self.detector_config.model.vehicle_alpr_det_model_path
+        vehicle_alpr_rec_model_path = self.detector_config.model.vehicle_alpr_rec_model_path
+        vehicle_rec_labelmap_path = self.detector_config.model.vehicle_rec_labelmap_path
+        folder_path = "/media/frigate/vehicle_alpr_crops"
+
+        if self.vehicle_alpr_det_model is None:
+            try:
+                print("Initializing vehicle alpr dec model...")
+                self.vehicle_alpr_det_model = ov.Core().compile_model(vehicle_alpr_det_model_path, "CPU")
+                print("Vehicle alpr dec model initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize vehicle alpr dec model: {e}")
+
+        if self.vehicle_alpr_rec_model is None:
+            try:
+                print("Initializing vehicle alpr rec model...")
+                self.vehicle_alpr_rec_model = ov.Core().compile_model(vehicle_alpr_rec_model_path, "CPU")
+                print("Vehicle alpr rec model initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize vehicle alpr rec model: {e}")
+
+        csv_file_path = os.path.join(folder_path, "license_plate_results.csv") # Path to CSV
+        with open(csv_file_path, mode='w', newline='') as csvfile: # opens the file to write.
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(['Image Filename', 'License Plate Prediction']) # Header
+
+            for filename in os.listdir(folder_path):
+                image_path = os.path.join(folder_path, filename)
+                if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')): # checks if file is an image.
+                    continue
+
+                image = cv2.imread(image_path)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = cv2.resize(image, (640, 640))
+                image = image.astype(np.float32)
+                image /= 255.0
+                image = np.transpose(image, (2, 0, 1))
+                preprocessed_image = np.expand_dims(image, axis=0)
+
+                infer_request = self.vehicle_alpr_det_model.create_infer_request()
+                infer_request.set_input_tensor(ov.Tensor(preprocessed_image))
+                infer_request.infer()
+
+                det_result = infer_request.get_output_tensor(0).data
+                det_minmax = min_max_scale(det_result[0])
+                det_boxes, det_confidences = post_process_detections(det_minmax[0].squeeze(0))
+
+                for box in det_boxes:
+                    ordered_box = order_points(box)
+                    x_min = np.min(ordered_box[:, 0])
+                    y_min = np.min(ordered_box[:, 1])
+                    x_max = np.max(ordered_box[:, 0])
+                    y_max = np.max(ordered_box[:, 1])
+
+                    cropped_image = preprocessed_image[0, :, y_min:y_max, x_min:x_max]
+                    cropped_image = np.transpose(cropped_image, (1, 2, 0))
+
+                    rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
+                    rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
+
+                    if (rect_height) != 0:
+                        if (rect_width / rect_height) > 1:
+                            resized_image = cv2.resize(cropped_image, (320, 48))
+                            resized_image = np.transpose(resized_image, (2, 0, 1))
+                            resized_image = np.expand_dims(resized_image, axis=0)
+
+                            infer_request = self.vehicle_alpr_rec_model.create_infer_request()
+                            infer_request.set_input_tensor(ov.Tensor(resized_image))
+                            infer_request.infer()
+                            rec_result = infer_request.get_output_tensor(0).data
+                            rec_result = np.array(rec_result)
+
+                            license_plate_string = decode_license_plate_ctc(rec_result, vehicle_rec_labelmap_path)
+
+                            csv_writer.writerow([filename, license_plate_string[0]]) # Write to CSV
+
+            

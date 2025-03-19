@@ -66,6 +66,8 @@ class LocalObjectDetector(ObjectDetector):
             self.dtype = InputDTypeEnum.int
 
         self.detect_api = create_detector(detector_config)
+        self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
+        
 
     def detect(self, tensor_input: np.ndarray, threshold=0.4):
         detections = []
@@ -119,9 +121,9 @@ def run_detector(
     signal.signal(signal.SIGINT, receiveSignal)
 
     frame_manager = SharedMemoryFrameManager()
-    print("detector_config",detector_config)
+    #print("detector_config",detector_config)
     object_detector = LocalObjectDetector(detector_config=detector_config)
-
+    
     outputs = {}
     for name in out_events.keys():
         out_shm = UntrackedSharedMemory(name=f"out-{name}", create=False)
@@ -155,7 +157,11 @@ def run_detector(
         start.value = 0.0
 
         avg_speed.value = (avg_speed.value * 9 + duration) / 10
-
+    
+    vehicle_alpr_enabled = detector_config.model.vehicle_alpr
+    if vehicle_alpr_enabled:
+        object_detector.vehicle_alpr()
+    
     logger.info("Exited detection process...")
 
 
