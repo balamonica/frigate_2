@@ -25,7 +25,30 @@ logger = logging.getLogger(__name__)
 
 DETECTOR_KEY = "openvino"
 
+def unclip_cv2(box, unclip_ratio):
+    """Unclips the bounding box using cv2 dilation."""
+    distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
+    
+    # Create a mask
+    mask = np.zeros((640, 640), dtype=np.uint8) # adjust image size as needed.
+    cv2.fillPoly(mask, [box.astype(np.int32)], 255)
 
+    # Dilate the mask
+    kernel_size = int(distance)
+    if kernel_size < 1:
+        kernel_size = 1
+    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    dilated_mask = cv2.dilate(mask, kernel, iterations=1)
+
+    # Find contours
+    contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Convert to NumPy array
+    if contours:
+        expanded = contours[0].reshape(-1, 2)
+        return expanded
+    else:
+        return box #return the original box if no contour found.
 
 def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
     # Ensure the output directory exists
@@ -115,7 +138,7 @@ def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_rati
         box = np.int0(box)
 
         sside = max(cv2.contourArea(box), 1)
-        print(sside)
+        # print(sside)
         if sside < 3:
             continue
         
@@ -125,7 +148,7 @@ def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_rati
         if score < box_thresh:
             continue
 
-        unclipped_box = unclip(box, unclip_ratio)
+        unclipped_box = unclip_cv2(box, unclip_ratio)
         
         # Ensure the box has exactly 4 points
         if len(unclipped_box) > 4:
@@ -170,7 +193,10 @@ def order_points(pts):
 def decode_license_plate_ctc(rec_result, label_file):
     """Decodes the recognition result using CTC principles."""
 
-    predicted_indices = np.argmax(rec_result, axis=3)  # Get predicted indices
+    print('In decode License plate module')
+    # print('rec_result size', rec_result.shape)
+    #print(rec_result)
+    predicted_indices = np.argmax(rec_result, axis=2)  # Get predicted indices
 
     # Load the label file
     with open(label_file, 'r') as f:
@@ -178,24 +204,27 @@ def decode_license_plate_ctc(rec_result, label_file):
 
     # Add the '<blank>' character to the labels (crucial for CTC)
     labels = ['<blank>'] + labels
-    print('label',len(labels))
+    # print('label',len(labels))
 
     decoded_text = []
+    # print('Predicted_indices', predicted_indices )
+
     for batch_idx in range(predicted_indices.shape[0]):  # Iterate through batch (1)
         current_text = ""
         previous_char_index = -1  # Initialize to an invalid index
 
-        for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
-            for i in range(predicted_indices.shape[2]):  # Iterate through sequence length (40)
-                char_index = predicted_indices[batch_idx, feature_map_idx, i].item()
+        #for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
+        for i in range(predicted_indices.shape[1]):  # Iterate through sequence length (40)
+            char_index = predicted_indices[batch_idx, i].item()
 
-                if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
-                    current_text += labels[char_index]
+            if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
+                current_text += labels[char_index]
 
-                previous_char_index = char_index
+            previous_char_index = char_index
 
         decoded_text.append(current_text)
 
+    print('decoded text',decoded_text)
     return decoded_text
 
 def load_character_dict(file_path):
@@ -266,6 +295,18 @@ class OvDetector(DetectionApi):
                 raise ValueError("vehicle_attr_labelmap_path is required when vehicle_attr is enabled")
             self.vehicle_attr_model = None  # Will be initialized when needed
             self.processed_vehicle_ids = set()
+
+        self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
+        if self.vehicle_alpr_enabled:
+            if not detector_config.model.vehicle_alpr_det_model_path:
+                logger.error("Vehicle alpr det model path not specified")
+                raise ValueError("vehicle_alpr_Det_model_path is required when vehicle_attr is enabled")
+            if not detector_config.model.vehicle_alpr_rec_model_path:
+                logger.error("Vehicle alpr rec model path not specified")
+                raise ValueError("vehicle_alpr_rec_model_path is required when vehicle_attr is enabled")
+            self.vehicle_attr_model = None  # Will be initialized when needed
+           
+
 
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
@@ -730,9 +771,22 @@ class OvDetector(DetectionApi):
                         output_dir="/media/frigate/vehicle_crops",
                         output_file="vehicle_attributes.csv"
                     )
+
             if self.vehicle_alpr_enabled:
                 vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
+                print('In ALPR module')
+
+                # if not vehicle_detections:
+                #     return detections
                 
+                vehicle_alpr_det_model_path = self.detector_config.model.vehicle_alpr_det_model_path
+                vehicle_alpr_rec_model_path = self.detector_config.model.vehicle_alpr_rec_model_path
+                vehicle_rec_labelmap_path = self.detector_config.model.vehicle_rec_labelmap_path
+
+                self.vehicle_alpr_det_model = ov.Core().compile_model(vehicle_alpr_det_model_path, "CPU")
+
+                self.vehicle_alpr_rec_model = ov.Core().compile_model(vehicle_alpr_rec_model_path, "CPU")
+
                 for detection in vehicle_detections:
                     
                     y_min, x_min, y_max, x_max = detection["box"]
@@ -740,23 +794,103 @@ class OvDetector(DetectionApi):
                     tensor_input_np = np.array(tensor_input)
                     image_to_save = tensor_input_np[0]  # Already in RGB format
                     
-                    # Crop the vehicle region
                     crop = image_to_save[int(y_min * 640):int(y_max * 640), 
-                                       int(x_min * 640):int(x_max * 640)]
+                                    int(x_min * 640):int(x_max * 640)]
+
+                    # save_cropped_images_and_write_csv(
+                    #             crop, 
+                    #             [], 
+                    #             [], 
+                    #             [], 
+                    #             frame_number=self.frame_counter,
+                    #             frame_time=current_time,
+                    #             output_dir="/media/frigate/vehicle_alpr_crops",
+                    #             output_file="vehicle_ALPR.csv"
+                    #         )
+                
                     crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                    image = cv2.resize(crop, (640, 640))
+                    image = image.astype(np.float32)
+                    image /= 255.0
+                    image = np.transpose(image, (2, 0, 1))
+                    preprocessed_image = np.expand_dims(image, axis=0)
 
-                    save_cropped_images_and_write_csv(
-                        crop, 
-                        detected_labels, 
-                        confidence_intervals, 
-                        bounding_boxes, 
-                        frame_number=self.frame_counter,
-                        frame_time=current_time,
-                        output_dir="/media/frigate/vehicle_alpr_crops",
-                        output_file="vehicle_alpr.csv"
-                    )
+                    infer_request = self.vehicle_alpr_det_model.create_infer_request()
+                    infer_request.set_input_tensor(ov.Tensor(preprocessed_image))
+                    infer_request.infer()
 
-            #print ('yolov11', detections)
+                    det_result = infer_request.get_output_tensor(0).data
+                    #print('det_result', det_result)
+                    # print('det_result_size', det_result.shape)
+
+                    det_minmax = min_max_scale(det_result[0])
+                    #print('det_minimax', det_minmax.shape)
+                    det_boxes, det_confidences = post_process_detections(det_minmax.squeeze(0))
+                    # print('det box',det_boxes)
+                    
+                    for box, confidence in zip(det_boxes, det_confidences):
+                        
+                        # Confidence threshold
+                        if confidence < 0.4:  # Adjust threshold as needed
+                            continue
+
+
+                        ordered_box = order_points(box)
+                        x_min = np.min(ordered_box[:, 0])
+                        y_min = np.min(ordered_box[:, 1])
+                        x_max = np.max(ordered_box[:, 0])
+                        y_max = np.max(ordered_box[:, 1])
+
+                        # print('box', x_min, ymin, x_max, y_max)
+
+                        rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
+                        rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
+
+                        # print('rect_width',rect_width)
+                        # print('rect_height', rect_height)
+                        # if rect_width < 10 or rect_height < 5:  # Adjust minimum size
+                        #     continue
+                        # if rect_width / rect_height < 1 or rect_width / rect_height > 6: # adjust aspect ratio
+                        #     continue
+
+                        # if x_min >= x_max or y_min >= y_max: # check for valid dimensions.
+                        #     continue
+
+                        cropped_image = preprocessed_image[0, :, int(y_min):int(y_max), int(x_min):int(x_max)]
+                        cropped_image = np.transpose(cropped_image, (1, 2, 0))
+                        # cv2.imwrite('/media/frigate/trial', cropped_image)
+                        #print('cropped image', cropped_image)
+
+                        
+                        if (rect_height) and (rect_width) != 0:
+                            if (rect_width / rect_height) > 1:
+                                if cropped_image.size != 0:
+                                
+                                # cv2.imwrite('/media/frigate/trial', cropped_image)
+
+                                    resized_image = cv2.resize(cropped_image, (320, 48))
+                                    resized_image = np.transpose(resized_image, (2, 0, 1))
+                                    resized_image = np.expand_dims(resized_image, axis=0)
+
+                                    infer_request = self.vehicle_alpr_rec_model.create_infer_request()
+                                    infer_request.set_input_tensor(ov.Tensor(resized_image))
+                                    infer_request.infer()
+                                    rec_result = infer_request.get_output_tensor(0).data
+                                    rec_result = np.array(rec_result)
+
+                                    license_plate_string = decode_license_plate_ctc(rec_result, vehicle_rec_labelmap_path)
+
+                                    save_cropped_images_and_write_csv(
+                                        crop, 
+                                        license_plate_string, 
+                                        confidence, 
+                                        ordered_box, 
+                                        frame_number=self.frame_counter,
+                                        frame_time=current_time,
+                                        output_dir="/media/frigate/vehicle_alpr_crops",
+                                        output_file="vehicle_ALPR.csv"
+                                    )
+
             return detections
         elif self.ov_model_type == ModelTypeEnum.yolov5:
             out_tensor = infer_request.get_output_tensor()
@@ -799,14 +933,14 @@ class OvDetector(DetectionApi):
             except Exception as e:
                 logger.error(f"Failed to initialize vehicle alpr rec model: {e}")
 
-        csv_file_path = os.path.join(folder_path, "license_plate_results.csv") # Path to CSV
-        with open(csv_file_path, mode='w', newline='') as csvfile: # opens the file to write.
+        csv_file_path = os.path.join(folder_path, "license_plate_results.csv")
+        with open(csv_file_path, mode='w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['Image Filename', 'License Plate Prediction']) # Header
+            csv_writer.writerow(['Image Filename', 'License Plate Prediction'])
 
             for filename in os.listdir(folder_path):
                 image_path = os.path.join(folder_path, filename)
-                if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')): # checks if file is an image.
+                if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
                     continue
 
                 image = cv2.imread(image_path)
@@ -825,19 +959,35 @@ class OvDetector(DetectionApi):
                 det_minmax = min_max_scale(det_result[0])
                 det_boxes, det_confidences = post_process_detections(det_minmax[0].squeeze(0))
 
-                for box in det_boxes:
+                for box, confidence in zip(det_boxes, det_confidences):
+                    # Confidence threshold
+                    if confidence < 0.6:  # Adjust threshold as needed
+                        continue
+
                     ordered_box = order_points(box)
                     x_min = np.min(ordered_box[:, 0])
                     y_min = np.min(ordered_box[:, 1])
                     x_max = np.max(ordered_box[:, 0])
                     y_max = np.max(ordered_box[:, 1])
 
-                    cropped_image = preprocessed_image[0, :, y_min:y_max, x_min:x_max]
-                    cropped_image = np.transpose(cropped_image, (1, 2, 0))
-
                     rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
                     rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
 
+
+                    # if rect_width < 10 or rect_height < 5:  # Adjust minimum size
+                    #     continue
+                    if rect_width / rect_height < 1 or rect_width / rect_height > 6: # adjust aspect ratio
+                        continue
+
+                    # if x_min >= x_max or y_min >= y_max: # check for valid dimensions.
+                    #     continue
+
+                    cropped_image = preprocessed_image[0, :, y_min:y_max, x_min:x_max]
+                    
+
+                    cropped_image = np.transpose(cropped_image, (1, 2, 0))
+
+                    
                     if (rect_height) != 0:
                         if (rect_width / rect_height) > 1:
                             resized_image = cv2.resize(cropped_image, (320, 48))
@@ -852,6 +1002,4 @@ class OvDetector(DetectionApi):
 
                             license_plate_string = decode_license_plate_ctc(rec_result, vehicle_rec_labelmap_path)
 
-                            csv_writer.writerow([filename, license_plate_string[0]]) # Write to CSV
-
-            
+                            csv_writer.writerow([filename, license_plate_string[0]])
