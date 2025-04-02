@@ -19,11 +19,18 @@ import cv2
 #from bytetrack import BYTETracker
 #from frigate.track.centroid_tracker import CentroidTracker
 image_counter = 0
+frame_buffer  = []
 #tracked_objects = {}
 #next_id = 0
 logger = logging.getLogger(__name__)
 
 DETECTOR_KEY = "openvino"
+
+
+def softmax(x):
+    """Compute softmax values for each sets of scores in x."""
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
 
 def unclip_cv2(box, unclip_ratio):
     """Unclips the bounding box using cv2 dilation."""
@@ -304,10 +311,36 @@ class OvDetector(DetectionApi):
             if not detector_config.model.vehicle_alpr_rec_model_path:
                 logger.error("Vehicle alpr rec model path not specified")
                 raise ValueError("vehicle_alpr_rec_model_path is required when vehicle_attr is enabled")
-            self.vehicle_attr_model = None  # Will be initialized when needed
-           
+            self.vehicle_alpr_model = None 
+            
+        self.human_falling_enabled = detector_config.model.human_falling
+        if self.human_falling:
+            if not detector_config.model.human_falling_model_path:
+                logger.error("Human fall detection model path not specified")
+                raise ValueError("human_falling_model_path is needed to detect falling")
+            self.human_falling_model = None 
 
+        self.human_fighting_enabled = detector_config.model.human_fighting
+        if self.human_fighting:
+            if not detector_config.model.human_fighting_model_path:
+                logger.error("Human fight detection model path not specified")
+                raise ValueError("human_fighting_model_path is needed to detect fighting")
+            self.human_fighting_model = None 
 
+        self.human_calling_enabled = detector_config.model.human_calling
+        if self.human_calling:
+            if not detector_config.model.human_calling_model_path:
+                logger.error("Human call detection model path not specified")
+                raise ValueError("human_calling_model_path is needed to detect calling")
+            self.human_calling_model = None 
+
+        self.human_smoking_enabled = detector_config.model.human_smoking
+        if self.human_smoking:
+            if not detector_config.model.human_smoking_model_path:
+                logger.error("Human smoking detection model path not specified")
+                raise ValueError("human_smoking_model_path is needed to detect smoking")
+            self.human_smoking_model = None 
+         
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
             raise FileNotFoundError
@@ -429,39 +462,39 @@ class OvDetector(DetectionApi):
             (pos[0] + (pos[2] / 2)) / self.w,  # x_max
         ]
 
-    def assign_tracking_ids(self, formatted_detections):
-        current_frame_ids = {}
+    # def assign_tracking_ids(self, formatted_detections):
+    #     current_frame_ids = {}
         
-        for detection in formatted_detections:
-            box = detection["box"]
-            center_x = (box[1] + box[3]) / 2
-            center_y = (box[0] + box[2]) / 2
-            detection_id = None
+    #     for detection in formatted_detections:
+    #         box = detection["box"]
+    #         center_x = (box[1] + box[3]) / 2
+    #         center_y = (box[0] + box[2]) / 2
+    #         detection_id = None
 
-            for obj_id, obj in self.tracked_objects.items():
-                obj_box = obj["box"]
-                obj_center_x = (obj_box[1] + obj_box[3]) / 2
-                obj_center_y = (obj_box[0] + obj_box[2]) / 2
-                distance = np.sqrt((center_x - obj_center_x) ** 2 + (center_y - obj_center_y) ** 2)
+    #         for obj_id, obj in self.tracked_objects.items():
+    #             obj_box = obj["box"]
+    #             obj_center_x = (obj_box[1] + obj_box[3]) / 2
+    #             obj_center_y = (obj_box[0] + obj_box[2]) / 2
+    #             distance = np.sqrt((center_x - obj_center_x) ** 2 + (center_y - obj_center_y) ** 2)
 
-                # Increase distance threshold to better match same person
-                if distance < 0.1:  # Changed from 0.003 to 0.1
-                    detection_id = obj_id
-                    self.tracked_objects[obj_id]["box"] = box
-                    break
+    #             # Increase distance threshold to better match same person
+    #             if distance < 0.1:  # Changed from 0.003 to 0.1
+    #                 detection_id = obj_id
+    #                 self.tracked_objects[obj_id]["box"] = box
+    #                 break
 
-            if detection_id is None:
-                detection_id = self.next_id
-                self.next_id += 1
+    #         if detection_id is None:
+    #             detection_id = self.next_id
+    #             self.next_id += 1
 
-            current_frame_ids[detection_id] = {
-                "box": box,
-                "label": detection["label"],
-                "score": detection["score"],
-                # "frame_time": detection["frame_time"]
-            }
+    #         current_frame_ids[detection_id] = {
+    #             "box": box,
+    #             "label": detection["label"],
+    #             "score": detection["score"],
+    #             # "frame_time": detection["frame_time"]
+    #         }
 
-        return current_frame_ids
+    #     return current_frame_ids
 
     def detect_raw(self, tensor_input):
         infer_request = self.interpreter.create_infer_request()
@@ -617,7 +650,7 @@ class OvDetector(DetectionApi):
                 # Filter person detections (class 0) from formatted_detections
                 person_detections = [d for d in formatted_detections if d['label'] == 0]
                 #print(f"Current frame number: {self.frame_counter}")
-                print('person_detections', person_detections)
+                #print('person_detections', person_detections)
 
                 for detection in person_detections:
                     print("Processing human attributes")
@@ -776,8 +809,8 @@ class OvDetector(DetectionApi):
                 vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
                 print('In ALPR module')
 
-                # if not vehicle_detections:
-                #     return detections
+                if not vehicle_detections:
+                    return detections
                 
                 vehicle_alpr_det_model_path = self.detector_config.model.vehicle_alpr_det_model_path
                 vehicle_alpr_rec_model_path = self.detector_config.model.vehicle_alpr_rec_model_path
@@ -797,17 +830,6 @@ class OvDetector(DetectionApi):
                     crop = image_to_save[int(y_min * 640):int(y_max * 640), 
                                     int(x_min * 640):int(x_max * 640)]
 
-                    # save_cropped_images_and_write_csv(
-                    #             crop, 
-                    #             [], 
-                    #             [], 
-                    #             [], 
-                    #             frame_number=self.frame_counter,
-                    #             frame_time=current_time,
-                    #             output_dir="/media/frigate/vehicle_alpr_crops",
-                    #             output_file="vehicle_ALPR.csv"
-                    #         )
-                
                     crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
                     image = cv2.resize(crop, (640, 640))
                     image = image.astype(np.float32)
@@ -820,20 +842,13 @@ class OvDetector(DetectionApi):
                     infer_request.infer()
 
                     det_result = infer_request.get_output_tensor(0).data
-                    #print('det_result', det_result)
-                    # print('det_result_size', det_result.shape)
-
                     det_minmax = min_max_scale(det_result[0])
-                    #print('det_minimax', det_minmax.shape)
                     det_boxes, det_confidences = post_process_detections(det_minmax.squeeze(0))
-                    # print('det box',det_boxes)
                     
-                    for box, confidence in zip(det_boxes, det_confidences):
-                        
+                    for box, confidence in zip(det_boxes, det_confidences):                        
                         # Confidence threshold
                         if confidence < 0.4:  # Adjust threshold as needed
                             continue
-
 
                         ordered_box = order_points(box)
                         x_min = np.min(ordered_box[:, 0])
@@ -841,7 +856,6 @@ class OvDetector(DetectionApi):
                         x_max = np.max(ordered_box[:, 0])
                         y_max = np.max(ordered_box[:, 1])
 
-                        # print('box', x_min, ymin, x_max, y_max)
 
                         rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
                         rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
@@ -858,16 +872,11 @@ class OvDetector(DetectionApi):
 
                         cropped_image = preprocessed_image[0, :, int(y_min):int(y_max), int(x_min):int(x_max)]
                         cropped_image = np.transpose(cropped_image, (1, 2, 0))
-                        # cv2.imwrite('/media/frigate/trial', cropped_image)
-                        #print('cropped image', cropped_image)
-
                         
                         if (rect_height) and (rect_width) != 0:
                             if (rect_width / rect_height) > 1:
                                 if cropped_image.size != 0:
                                 
-                                # cv2.imwrite('/media/frigate/trial', cropped_image)
-
                                     resized_image = cv2.resize(cropped_image, (320, 48))
                                     resized_image = np.transpose(resized_image, (2, 0, 1))
                                     resized_image = np.expand_dims(resized_image, axis=0)
@@ -891,7 +900,64 @@ class OvDetector(DetectionApi):
                                         output_file="vehicle_ALPR.csv"
                                     )
 
+            if self.human_falling_enabled:
+
+                person_detections = [d for d in formatted_detections if d['label'] == 0]
+
+                if not person_detections:
+                    return detections
+
+                human_falling_model_path = self.detector_config.model.human_falling_model_path
+                self.human_falling_model = ov.Core().compile_model(human_falling_model_path, "CPU")
+
+                tensor_input_np = np.array(tensor_input)
+                frame = cv2.cvtColor(tensor_input_np, cv2.COLOR_BGR2RGB)
+                frame = cv2.resize(frame, (320, 320))
+                frame = frame.astype(np.float32) / 255.0
+                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                frame = (frame - mean) / std
+                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
+
+                frame_buffer.append(preprocessed_frame)
+
+                if len(frame_buffer) == 8: # Process a batch of 8 frames
+                    input_data = np.stack(frame_buffer, axis=0) # (T=8, C, H, W)
+                    input_data = np.expand_dims(input_data, axis=0) # (N=1, T=8, C, H, W)
+
+                    infer_request = self.human_falling_model.create_infer_request()
+                    infer_request.set_input_tensor(ov.Tensor(input_data))
+                    infer_request.infer()
+
+                    detections = infer_request.get_output_tensor(0).data
+
+                    # Process the output for this batch of 8 frames
+                    output = detections.flatten() # Assuming the output is flattened
+                    output = softmax(output)
+                    top_k = 1
+                    classes_indices = np.argpartition(output, -top_k)[-top_k:]
+                    classes_indices = classes_indices[np.argsort(-output[classes_indices])]
+                    scores = output[classes_indices]
+                    labels = ["Not Falling", "Falling"]
+
+                    predicted_label = labels[classes_indices[0]]
+                    confidence = scores[0]
+                    frame_buffer = [];
+
+                    if classes_indices[0] == 1:
+                        save_cropped_images_and_write_csv(
+                                        tensor_input_np, 
+                                        predicted_label, 
+                                        confidence, 
+                                        detection["box"], 
+                                        frame_number=self.frame_counter,
+                                        frame_time=current_time,
+                                        output_dir="/media/frigate/falling_crops",
+                                        output_file="Falling_det.csv"
+                                    )
+   
             return detections
+        
         elif self.ov_model_type == ModelTypeEnum.yolov5:
             out_tensor = infer_request.get_output_tensor()
             output_data = out_tensor.data[0]
@@ -911,95 +977,4 @@ class OvDetector(DetectionApi):
                 )
             return detections
     
-    def vehicle_alpr(self):
-        vehicle_alpr_det_model_path = self.detector_config.model.vehicle_alpr_det_model_path
-        vehicle_alpr_rec_model_path = self.detector_config.model.vehicle_alpr_rec_model_path
-        vehicle_rec_labelmap_path = self.detector_config.model.vehicle_rec_labelmap_path
-        folder_path = "/media/frigate/vehicle_alpr_crops"
-
-        if self.vehicle_alpr_det_model is None:
-            try:
-                print("Initializing vehicle alpr dec model...")
-                self.vehicle_alpr_det_model = ov.Core().compile_model(vehicle_alpr_det_model_path, "CPU")
-                print("Vehicle alpr dec model initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize vehicle alpr dec model: {e}")
-
-        if self.vehicle_alpr_rec_model is None:
-            try:
-                print("Initializing vehicle alpr rec model...")
-                self.vehicle_alpr_rec_model = ov.Core().compile_model(vehicle_alpr_rec_model_path, "CPU")
-                print("Vehicle alpr rec model initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize vehicle alpr rec model: {e}")
-
-        csv_file_path = os.path.join(folder_path, "license_plate_results.csv")
-        with open(csv_file_path, mode='w', newline='') as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['Image Filename', 'License Plate Prediction'])
-
-            for filename in os.listdir(folder_path):
-                image_path = os.path.join(folder_path, filename)
-                if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
-                    continue
-
-                image = cv2.imread(image_path)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image = cv2.resize(image, (640, 640))
-                image = image.astype(np.float32)
-                image /= 255.0
-                image = np.transpose(image, (2, 0, 1))
-                preprocessed_image = np.expand_dims(image, axis=0)
-
-                infer_request = self.vehicle_alpr_det_model.create_infer_request()
-                infer_request.set_input_tensor(ov.Tensor(preprocessed_image))
-                infer_request.infer()
-
-                det_result = infer_request.get_output_tensor(0).data
-                det_minmax = min_max_scale(det_result[0])
-                det_boxes, det_confidences = post_process_detections(det_minmax[0].squeeze(0))
-
-                for box, confidence in zip(det_boxes, det_confidences):
-                    # Confidence threshold
-                    if confidence < 0.6:  # Adjust threshold as needed
-                        continue
-
-                    ordered_box = order_points(box)
-                    x_min = np.min(ordered_box[:, 0])
-                    y_min = np.min(ordered_box[:, 1])
-                    x_max = np.max(ordered_box[:, 0])
-                    y_max = np.max(ordered_box[:, 1])
-
-                    rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
-                    rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
-
-
-                    # if rect_width < 10 or rect_height < 5:  # Adjust minimum size
-                    #     continue
-                    if rect_width / rect_height < 1 or rect_width / rect_height > 6: # adjust aspect ratio
-                        continue
-
-                    # if x_min >= x_max or y_min >= y_max: # check for valid dimensions.
-                    #     continue
-
-                    cropped_image = preprocessed_image[0, :, y_min:y_max, x_min:x_max]
-                    
-
-                    cropped_image = np.transpose(cropped_image, (1, 2, 0))
-
-                    
-                    if (rect_height) != 0:
-                        if (rect_width / rect_height) > 1:
-                            resized_image = cv2.resize(cropped_image, (320, 48))
-                            resized_image = np.transpose(resized_image, (2, 0, 1))
-                            resized_image = np.expand_dims(resized_image, axis=0)
-
-                            infer_request = self.vehicle_alpr_rec_model.create_infer_request()
-                            infer_request.set_input_tensor(ov.Tensor(resized_image))
-                            infer_request.infer()
-                            rec_result = infer_request.get_output_tensor(0).data
-                            rec_result = np.array(rec_result)
-
-                            license_plate_string = decode_license_plate_ctc(rec_result, vehicle_rec_labelmap_path)
-
-                            csv_writer.writerow([filename, license_plate_string[0]])
+    

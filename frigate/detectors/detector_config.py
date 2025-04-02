@@ -93,7 +93,17 @@ class ModelConfig(BaseModel):
     #vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
     #vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
     
-    
+    human_fight: bool = Field(default=False, title="Enable human fighting detection")
+    human_fight_model_path: Optional[str] = Field(None, title="Human fighting model path")
+
+    human_calling: bool = Field(default=False, title="Enable human calling detection")
+    human_calling_model_path: Optional[str] = Field(None, title="Human calling model path")
+
+    human_falling: bool = Field(default=False, title="Enable human falling detection")
+    human_falling_model_path: Optional[str] = Field(None, title="Human falling model path")
+
+    human_smoking: bool = Field(default=False, title="Enable human smoking detection")
+    human_smoking_model_path: Optional[str] = Field(None, title="Human smoking model path")   
 
     _merged_labelmap: Optional[Dict[int, str]] = PrivateAttr()
     _colormap: Dict[int, Tuple[int, int, int]] = PrivateAttr()
@@ -145,6 +155,22 @@ class ModelConfig(BaseModel):
             self.vehicle_alpr_det_model_path = config.get("vehicle_alpr_det_model_path", None)
             self.vehicle_alpr_rec_model_path = config.get("vehicle_alpr_rec_model_path", None)
             self.vehicle_rec_labelmap_path = config.get("vehicle_rec_labelmap_path", None)
+
+            #Read the human falling parameters
+            self.human_falling = config.get("human_falling", False)
+            self.human_falling_model_path = config.get("human_falling_model_path", None)
+
+            #Read the human calling parameters
+            self.human_calling = config.get("human_calling", False)
+            self.human_calling_model_path = config.get("human_calling_model_path", None)
+
+            #Read the human fighting parameters
+            self.human_fighting = config.get("human_fighting", False)
+            self.human_fighting_model_path = config.get("human_fighting_model_path", None)
+
+            #Read the human smoking parameters
+            self.human_smoking = config.get("human_smoking", False)
+            self.human_smoking_model_path = config.get("human_smoking_model_path", None)
 
         self._merged_labelmap = {
             **load_labels(config.get("labelmap_path", "/labelmap.txt")),
