@@ -290,6 +290,7 @@ class OvDetector(DetectionApi):
         #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
         self.tracked_objects = {}  # This can be managed by the tracker
         self.processed_object_ids = set()
+        self.frame_buffer = []
 
         # Initialize vehicle attribute model parameters
         self.vehicle_attr_enabled = detector_config.model.vehicle_attr
@@ -314,28 +315,28 @@ class OvDetector(DetectionApi):
             self.vehicle_alpr_model = None 
             
         self.human_falling_enabled = detector_config.model.human_falling
-        if self.human_falling:
+        if self.human_falling_enabled:
             if not detector_config.model.human_falling_model_path:
                 logger.error("Human fall detection model path not specified")
                 raise ValueError("human_falling_model_path is needed to detect falling")
             self.human_falling_model = None 
 
         self.human_fighting_enabled = detector_config.model.human_fighting
-        if self.human_fighting:
+        if self.human_fighting_enabled:
             if not detector_config.model.human_fighting_model_path:
                 logger.error("Human fight detection model path not specified")
                 raise ValueError("human_fighting_model_path is needed to detect fighting")
             self.human_fighting_model = None 
 
         self.human_calling_enabled = detector_config.model.human_calling
-        if self.human_calling:
+        if self.human_calling_enabled:
             if not detector_config.model.human_calling_model_path:
                 logger.error("Human call detection model path not specified")
                 raise ValueError("human_calling_model_path is needed to detect calling")
             self.human_calling_model = None 
 
         self.human_smoking_enabled = detector_config.model.human_smoking
-        if self.human_smoking:
+        if self.human_smoking_enabled:
             if not detector_config.model.human_smoking_model_path:
                 logger.error("Human smoking detection model path not specified")
                 raise ValueError("human_smoking_model_path is needed to detect smoking")
@@ -589,6 +590,7 @@ class OvDetector(DetectionApi):
 
         # Add the YOLOv8/v11 output processing here
         if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
+            print('In yolov8 openvino')
             # Increment frame counter
             self.frame_counter += 1
             current_time = time.time()
@@ -901,17 +903,19 @@ class OvDetector(DetectionApi):
                                     )
 
             if self.human_falling_enabled:
+                print('In fall detector')
 
-                person_detections = [d for d in formatted_detections if d['label'] == 0]
+                # person_detections = [d for d in formatted_detections if d['label'] == 0]
 
-                if not person_detections:
-                    return detections
+                # if not person_detections:
+                #     return detections
 
                 human_falling_model_path = self.detector_config.model.human_falling_model_path
                 self.human_falling_model = ov.Core().compile_model(human_falling_model_path, "CPU")
 
                 tensor_input_np = np.array(tensor_input)
-                frame = cv2.cvtColor(tensor_input_np, cv2.COLOR_BGR2RGB)
+                crop = tensor_input_np[0]
+                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
                 frame = cv2.resize(frame, (320, 320))
                 frame = frame.astype(np.float32) / 255.0
                 mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -919,20 +923,22 @@ class OvDetector(DetectionApi):
                 frame = (frame - mean) / std
                 preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
 
-                frame_buffer.append(preprocessed_frame)
+                self.frame_buffer.append(preprocessed_frame)
+                print('frame buffer length' , len(self.frame_buffer))
 
-                if len(frame_buffer) == 8: # Process a batch of 8 frames
-                    input_data = np.stack(frame_buffer, axis=0) # (T=8, C, H, W)
+                if len(self.frame_buffer) == 8: # Process a batch of 8 frames
+                    print('In Fall detection if clause')
+                    input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
                     input_data = np.expand_dims(input_data, axis=0) # (N=1, T=8, C, H, W)
 
                     infer_request = self.human_falling_model.create_infer_request()
                     infer_request.set_input_tensor(ov.Tensor(input_data))
                     infer_request.infer()
 
-                    detections = infer_request.get_output_tensor(0).data
+                    fall_detection = infer_request.get_output_tensor(0).data
 
                     # Process the output for this batch of 8 frames
-                    output = detections.flatten() # Assuming the output is flattened
+                    output = fall_detection.flatten() # Assuming the output is flattened
                     output = softmax(output)
                     top_k = 1
                     classes_indices = np.argpartition(output, -top_k)[-top_k:]
@@ -942,20 +948,142 @@ class OvDetector(DetectionApi):
 
                     predicted_label = labels[classes_indices[0]]
                     confidence = scores[0]
-                    frame_buffer = [];
-
+                    self.frame_buffer = [];
+                    print('classes_indices', classes_indices[0])
                     if classes_indices[0] == 1:
+                        print('Inside class_index 1')
                         save_cropped_images_and_write_csv(
-                                        tensor_input_np, 
+                                        crop, 
                                         predicted_label, 
                                         confidence, 
-                                        detection["box"], 
+                                        #detections["box"], 
+                                        [],
                                         frame_number=self.frame_counter,
                                         frame_time=current_time,
                                         output_dir="/media/frigate/falling_crops",
                                         output_file="Falling_det.csv"
                                     )
-   
+                        
+            if self.human_fighting_enabled:
+                print('In fight detector')
+
+                # person_detections = [d for d in formatted_detections if d['label'] == 0]
+
+                # if not person_detections:
+                #     return detections
+
+                human_fighting_model_path = self.detector_config.model.human_fighting_model_path
+                self.human_fighting_model = ov.Core().compile_model(human_fighting_model_path, "CPU")
+
+                tensor_input_np = np.array(tensor_input)
+                crop = tensor_input_np[0]
+                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                frame = cv2.resize(frame, (320, 320))
+                frame = frame.astype(np.float32) / 255.0
+                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                frame = (frame - mean) / std
+                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
+
+                self.frame_buffer.append(preprocessed_frame)
+                print('frame buffer length' , len(self.frame_buffer))
+
+                if len(self.frame_buffer) == 8: # Process a batch of 8 frames
+                    print('In fight detection if clause')
+                    input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
+                    input_data = np.expand_dims(input_data, axis=0) # (N=1, T=8, C, H, W)
+
+                    infer_request = self.human_fighting_model.create_infer_request()
+                    infer_request.set_input_tensor(ov.Tensor(input_data))
+                    infer_request.infer()
+
+                    fight_detection = infer_request.get_output_tensor(0).data
+
+                    # Process the output for this batch of 8 frames
+                    output = fight_detection.flatten() # Assuming the output is flattened
+                    output = softmax(output)
+                    top_k = 1
+                    classes_indices = np.argpartition(output, -top_k)[-top_k:]
+                    classes_indices = classes_indices[np.argsort(-output[classes_indices])]
+                    scores = output[classes_indices]
+                    labels = ["Not Fighting", "Fighting"]
+
+                    predicted_label = labels[classes_indices[0]]
+                    confidence = scores[0]
+                    self.frame_buffer = [];
+                    print('classes_indices', classes_indices[0])
+                    if classes_indices[0] == 1:
+                        print('Inside class_index 1')
+                        save_cropped_images_and_write_csv(
+                                        crop, 
+                                        predicted_label, 
+                                        confidence, 
+                                        #detections["box"], 
+                                        [],
+                                        frame_number=self.frame_counter,
+                                        frame_time=current_time,
+                                        output_dir="/media/frigate/fighting_crops",
+                                        output_file="Fighting_det.csv"
+                                    )
+
+            if self.human_calling_enabled:
+                print('In Calling detector')
+
+                # person_detections = [d for d in formatted_detections if d['label'] == 0]
+
+                # if not person_detections:
+                #     return detections
+
+                human_calling_model_path = self.detector_config.model.human_calling_model_path
+                self.human_calling_model = ov.Core().compile_model(human_calling_model_path, "CPU")
+
+                tensor_input_np = np.array(tensor_input)
+                crop = tensor_input_np[0]
+                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                frame = cv2.resize(frame, (320, 320))
+                frame = frame.astype(np.float32) / 255.0
+                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                frame = (frame - mean) / std
+                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
+
+                    
+                #input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
+                input_data = np.expand_dims(preprocessed_frame, axis=0) # (N=1, T=8, C, H, W)
+
+                infer_request = self.human_calling_model.create_infer_request()
+                infer_request.set_input_tensor(ov.Tensor(input_data))
+                infer_request.infer()
+
+                calling_detection = infer_request.get_output_tensor(0).data
+
+                # Process the output for this batch of 8 frames
+                output = calling_detection.flatten() # Assuming the output is flattened
+                output = softmax(output)
+                top_k = 1
+                classes_indices = np.argpartition(output, -top_k)[-top_k:]
+                classes_indices = classes_indices[np.argsort(-output[classes_indices])]
+                scores = output[classes_indices]
+                labels = ["Not Calling", "Calling"]
+
+                predicted_label = labels[classes_indices[0]]
+                confidence = scores[0]
+                self.frame_buffer = [];
+                print('classes_indices', classes_indices[0])
+                if classes_indices[0] == 1:
+                    print('Inside class_index 1')
+                    save_cropped_images_and_write_csv(
+                                    crop, 
+                                    predicted_label, 
+                                    confidence, 
+                                    #detections["box"], 
+                                    [],
+                                    frame_number=self.frame_counter,
+                                    frame_time=current_time,
+                                    output_dir="/media/frigate/Calling_crops",
+                                    output_file="Calling_det.csv"
+                                )
+          
             return detections
         
         elif self.ov_model_type == ModelTypeEnum.yolov5:

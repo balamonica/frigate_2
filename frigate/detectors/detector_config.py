@@ -93,8 +93,8 @@ class ModelConfig(BaseModel):
     #vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
     #vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
     
-    human_fight: bool = Field(default=False, title="Enable human fighting detection")
-    human_fight_model_path: Optional[str] = Field(None, title="Human fighting model path")
+    human_fighting: bool = Field(default=False, title="Enable human fighting detection")
+    human_fighting_model_path: Optional[str] = Field(None, title="Human fighting model path")
 
     human_calling: bool = Field(default=False, title="Enable human calling detection")
     human_calling_model_path: Optional[str] = Field(None, title="Human calling model path")
