@@ -226,6 +226,9 @@ def events(params: EventsQueryParams = Depends()):
     if min_score is not None:
         clauses.append((Event.data["score"] >= min_score))
 
+    # if condition is true:
+    #     clauses.append((Event.data["attributes"] >= min_score))
+
     if min_length is not None:
         clauses.append(((Event.end_time - Event.start_time) >= min_length))
 

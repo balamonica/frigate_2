@@ -481,7 +481,7 @@ class CameraState:
             self.previous_frame_id = frame_name
 
 
-class TrackedObjectProcessor(threading.Thread):
+class  TrackedObjectProcessor(threading.Thread):
     def __init__(
         self,
         config: FrigateConfig,

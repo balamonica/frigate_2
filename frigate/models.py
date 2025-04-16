@@ -46,7 +46,7 @@ class Event(Model):  # type: ignore[misc]
     detector_type = CharField(max_length=32)
     model_type = CharField(max_length=32)
     data = JSONField()  # ex: tracked object box, region, etc.
-
+    human_attributes = JSONField(null=True)
 
 class Timeline(Model):  # type: ignore[misc]
     timestamp = DateTimeField()

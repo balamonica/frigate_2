@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-
+import random
 import numpy as np
 import openvino as ov
 import openvino.properties as props
@@ -60,13 +60,13 @@ def unclip_cv2(box, unclip_ratio):
 def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
-
+    counter2= random.randint(1,20)
     # Convert the image to BGR format
     crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
 
     # Create a filename with both timestamp and frame number
     timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
-    cropped_image_filename = f"frame_{frame_number}_time_{timestamp}.jpg"
+    cropped_image_filename = f"frame_{frame_number}_time_{timestamp}_{counter2}.jpg"
     cropped_image_path = os.path.join(output_dir, cropped_image_filename)
 
     # Save the cropped image in BGR format
@@ -593,6 +593,7 @@ class OvDetector(DetectionApi):
             print('In yolov8 openvino')
             # Increment frame counter
             self.frame_counter += 1
+            print('frame number', self.frame_counter)
             current_time = time.time()
 
             out_tensor = infer_request.get_output_tensor()
@@ -624,7 +625,9 @@ class OvDetector(DetectionApi):
                         float(detections[i][5])
                     ],
                 })
-            #print('Formatted_detections', formatted_detections)
+            print('Formatted_detections', formatted_detections)
+
+            print('Detections', detections)
 
             # Process human attributes if enabled
             if self.human_attr_enabled:
@@ -652,7 +655,7 @@ class OvDetector(DetectionApi):
                 # Filter person detections (class 0) from formatted_detections
                 person_detections = [d for d in formatted_detections if d['label'] == 0]
                 #print(f"Current frame number: {self.frame_counter}")
-                #print('person_detections', person_detections)
+                print('person_detections', person_detections)
 
                 for detection in person_detections:
                     print("Processing human attributes")
@@ -676,23 +679,23 @@ class OvDetector(DetectionApi):
                     bounding_boxes = [x_min, y_min, x_max, y_max]
                     scores = image_attr.flatten()
                     for i, score in enumerate(scores):
-                        if score > 0.5:
+                        if score > 0.6:
                             detected_labels.append(load_labels(human_attr_labelmap_path)[i])
                             confidence_intervals.append(score)
 
-                    if human_attr_show_label:
-                        draw_box_with_label(
-                            tensor_input,
-                            int(x_min * 640),
-                            int(y_min * 640),
-                            int(x_max * 640),
-                            int(y_max * 640),
-                            label=detected_labels,
-                            info="",
-                            thickness=2,
-                            color=(0, 255, 0),
-                            position="ul"
-                        )
+                    # if human_attr_show_label:
+                    #     draw_box_with_label(
+                    #         tensor_input,
+                    #         int(x_min * 640),
+                    #         int(y_min * 640),
+                    #         int(x_max * 640),
+                    #         int(y_max * 640),
+                    #         label=detected_labels,
+                    #         info="",
+                    #         thickness=2,
+                    #         color=(0, 255, 0),
+                    #         position="ul"
+                    #     )
 
                     save_cropped_images_and_write_csv(
                         crop, 
@@ -1040,7 +1043,7 @@ class OvDetector(DetectionApi):
                 tensor_input_np = np.array(tensor_input)
                 crop = tensor_input_np[0]
                 frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (320, 320))
+                frame = cv2.resize(frame, (224, 224))
                 frame = frame.astype(np.float32) / 255.0
                 mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
                 std = np.array([0.229, 0.224, 0.225], dtype=np.float32)

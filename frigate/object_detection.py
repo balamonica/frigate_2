@@ -155,9 +155,9 @@ def run_detector(
         outputs[connection_id]["np"][:] = detections[:]
         out_events[connection_id].set()
         start.value = 0.0
-        print('In object_detection _ while loop')
+        # print('In object_detection _ while loop')
         avg_speed.value = (avg_speed.value * 9 + duration) / 10
-    print('out object_detection _ while loop')
+    # print('out object_detection _ while loop')
     # vehicle_alpr_enabled = detector_config.model.vehicle_alpr
     # if vehicle_alpr_enabled:
     #     object_detector.vehicle_alpr()
