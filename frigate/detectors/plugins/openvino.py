@@ -24,230 +24,230 @@ logger = logging.getLogger(__name__)
 DETECTOR_KEY = "openvino"
 
 
-def softmax(x):
-    """Compute softmax values for each sets of scores in x."""
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum()
+# def softmax(x):
+#     """Compute softmax values for each sets of scores in x."""
+#     e_x = np.exp(x - np.max(x))
+#     return e_x / e_x.sum()
 
-def unclip_cv2(box, unclip_ratio):
-    """Unclips the bounding box using cv2 dilation."""
-    distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
+# def unclip_cv2(box, unclip_ratio):
+#     """Unclips the bounding box using cv2 dilation."""
+#     distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
     
-    # Create a mask
-    mask = np.zeros((640, 640), dtype=np.uint8) # adjust image size as needed.
-    cv2.fillPoly(mask, [box.astype(np.int32)], 255)
+#     # Create a mask
+#     mask = np.zeros((640, 640), dtype=np.uint8) # adjust image size as needed.
+#     cv2.fillPoly(mask, [box.astype(np.int32)], 255)
 
-    # Dilate the mask
-    kernel_size = int(distance)
-    if kernel_size < 1:
-        kernel_size = 1
-    kernel = np.ones((kernel_size, kernel_size), np.uint8)
-    dilated_mask = cv2.dilate(mask, kernel, iterations=1)
+#     # Dilate the mask
+#     kernel_size = int(distance)
+#     if kernel_size < 1:
+#         kernel_size = 1
+#     kernel = np.ones((kernel_size, kernel_size), np.uint8)
+#     dilated_mask = cv2.dilate(mask, kernel, iterations=1)
 
-    # Find contours
-    contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#     # Find contours
+#     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Convert to NumPy array
-    if contours:
-        expanded = contours[0].reshape(-1, 2)
-        return expanded
-    else:
-        return box #return the original box if no contour found.
+#     # Convert to NumPy array
+#     if contours:
+#         expanded = contours[0].reshape(-1, 2)
+#         return expanded
+#     else:
+#         return box #return the original box if no contour found.
 
-def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-    counter2= random.randint(1,20)
-    # Convert the image to BGR format
-    crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
+# def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
+#     # Ensure the output directory exists
+#     os.makedirs(output_dir, exist_ok=True)
+#     counter2= random.randint(1,20)
+#     # Convert the image to BGR format
+#     crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
 
-    # Create a filename with both timestamp and frame number
-    timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
-    cropped_image_filename = f"frame_{frame_number}_time_{timestamp}_{counter2}.jpg"
-    cropped_image_path = os.path.join(output_dir, cropped_image_filename)
+#     # Create a filename with both timestamp and frame number
+#     timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
+#     cropped_image_filename = f"frame_{frame_number}_time_{timestamp}_{counter2}.jpg"
+#     cropped_image_path = os.path.join(output_dir, cropped_image_filename)
 
-    # Save the cropped image in BGR format
-    cv2.imwrite(cropped_image_path, crop_bgr)
+#     # Save the cropped image in BGR format
+#     cv2.imwrite(cropped_image_path, crop_bgr)
 
-    # Prepare the data for the DataFrame
-    data = {
-        "Image Name": cropped_image_filename,
-        "Frame Number": frame_number,
-        "Frame Time": frame_time,
-        "Detected Labels": [detected_labels],
-        "Confidence Intervals": [confidence_intervals],
-        "Bounding Box": [bounding_boxes]
-    }
+#     # Prepare the data for the DataFrame
+#     data = {
+#         "Image Name": cropped_image_filename,
+#         "Frame Number": frame_number,
+#         "Frame Time": frame_time,
+#         "Detected Labels": [detected_labels],
+#         "Confidence Intervals": [confidence_intervals],
+#         "Bounding Box": [bounding_boxes]
+#     }
 
-    # Create a DataFrame from the collected data
-    df = pd.DataFrame(data)
+#     # Create a DataFrame from the collected data
+#     df = pd.DataFrame(data)
 
-    # Write the DataFrame to a CSV file
-    csv_output_path = os.path.join("/media/frigate", output_file)
+#     # Write the DataFrame to a CSV file
+#     csv_output_path = os.path.join("/media/frigate", output_file)
 
-    # Check if the file exists to determine if we need to write the header
-    if not os.path.isfile(csv_output_path):
-        df.to_csv(csv_output_path, index=False)  # Write header if file does not exist
-    else:
-        df.to_csv(csv_output_path, mode='a', header=False, index=False)  # Append without header
+#     # Check if the file exists to determine if we need to write the header
+#     if not os.path.isfile(csv_output_path):
+#         df.to_csv(csv_output_path, index=False)  # Write header if file does not exist
+#     else:
+#         df.to_csv(csv_output_path, mode='a', header=False, index=False)  # Append without header
 
-    #print(f"Attributes written to {csv_output_path}")
+#     #print(f"Attributes written to {csv_output_path}")
 
-def load_labels(labelmap_path):
-    encodings = ['utf-8', 'latin-1', 'cp1252']  # List of encodings to try
+# def load_labels(labelmap_path):
+#     encodings = ['utf-8', 'latin-1', 'cp1252']  # List of encodings to try
     
-    for encoding in encodings:
-        try:
-            with open(labelmap_path, 'r', encoding=encoding) as f:
-                labels = f.read().strip().splitlines()
-            return labels
-        except UnicodeDecodeError:
-            continue
+#     for encoding in encodings:
+#         try:
+#             with open(labelmap_path, 'r', encoding=encoding) as f:
+#                 labels = f.read().strip().splitlines()
+#             return labels
+#         except UnicodeDecodeError:
+#             continue
     
-    # If none of the encodings work, try binary mode
-    try:
-        with open(labelmap_path, 'rb') as f:
-            labels = f.read().decode('utf-8', errors='ignore').strip().splitlines()
-        return labels
-    except Exception as e:
-        logger.error(f"Failed to load labels from {labelmap_path}: {str(e)}")
-        return []
+#     # If none of the encodings work, try binary mode
+#     try:
+#         with open(labelmap_path, 'rb') as f:
+#             labels = f.read().decode('utf-8', errors='ignore').strip().splitlines()
+#         return labels
+#     except Exception as e:
+#         logger.error(f"Failed to load labels from {labelmap_path}: {str(e)}")
+#         return []
     
-def unclip(box, unclip_ratio):
-        """Unclips the bounding box using pyclipper."""
-        poly = box.tolist()
-        distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
-        offset = pyclipper.PyclipperOffset()
-        offset.AddPath(poly, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        expanded = np.array(offset.Execute(distance))
-        return expanded.reshape(-1, 2)
+# def unclip(box, unclip_ratio):
+#         """Unclips the bounding box using pyclipper."""
+#         poly = box.tolist()
+#         distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
+#         offset = pyclipper.PyclipperOffset()
+#         offset.AddPath(poly, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+#         expanded = np.array(offset.Execute(distance))
+#         return expanded.reshape(-1, 2)
 
-def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_ratio=2.0):
+# def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_ratio=2.0):
 
 
-    bitmap = (feature_map > thresh).astype(np.uint8)
+#     bitmap = (feature_map > thresh).astype(np.uint8)
     
-    dest_width, dest_height = 640, 640  
+#     dest_width, dest_height = 640, 640  
     
-    # Initialize scores list
-    scores = []
-    contours, _ = cv2.findContours(bitmap, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+#     # Initialize scores list
+#     scores = []
+#     contours, _ = cv2.findContours(bitmap, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-    boxes = []
-    confidences = []
+#     boxes = []
+#     confidences = []
 
-    for contour in contours:
-        rect = cv2.minAreaRect(contour)
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
+#     for contour in contours:
+#         rect = cv2.minAreaRect(contour)
+#         box = cv2.boxPoints(rect)
+#         box = np.int0(box)
 
-        sside = max(cv2.contourArea(box), 1)
-        # print(sside)
-        if sside < 3:
-            continue
+#         sside = max(cv2.contourArea(box), 1)
+#         # print(sside)
+#         if sside < 3:
+#             continue
         
-        score = cv2.contourArea(box)
-        # print('score', score)
+#         score = cv2.contourArea(box)
+#         # print('score', score)
 
-        if score < box_thresh:
-            continue
+#         if score < box_thresh:
+#             continue
 
-        unclipped_box = unclip_cv2(box, unclip_ratio)
+#         unclipped_box = unclip_cv2(box, unclip_ratio)
         
-        # Ensure the box has exactly 4 points
-        if len(unclipped_box) > 4:
-            # Get the bounding rectangle of the unclipped polygon
-            rect = cv2.minAreaRect(unclipped_box)
-            unclipped_box = cv2.boxPoints(rect)
+#         # Ensure the box has exactly 4 points
+#         if len(unclipped_box) > 4:
+#             # Get the bounding rectangle of the unclipped polygon
+#             rect = cv2.minAreaRect(unclipped_box)
+#             unclipped_box = cv2.boxPoints(rect)
 
-        #resize to original size
-        height, width = bitmap.shape
-        unclipped_box[:, 0] = np.clip(np.round(unclipped_box[:, 0] / width * dest_width), 0, 640)
-        unclipped_box[:, 1] = np.clip(np.round(unclipped_box[:, 1] / height * dest_height), 0, 640)
+#         #resize to original size
+#         height, width = bitmap.shape
+#         unclipped_box[:, 0] = np.clip(np.round(unclipped_box[:, 0] / width * dest_width), 0, 640)
+#         unclipped_box[:, 1] = np.clip(np.round(unclipped_box[:, 1] / height * dest_height), 0, 640)
 
-        boxes.append(unclipped_box.astype(np.int16))
-        scores.append(score)
+#         boxes.append(unclipped_box.astype(np.int16))
+#         scores.append(score)
 
-    if not boxes:  # If no boxes were found
-        return np.array([], dtype=np.int16), []
+#     if not boxes:  # If no boxes were found
+#         return np.array([], dtype=np.int16), []
         
-    # Ensure all boxes have the same shape before creating array
-    boxes = [box[:4] if len(box) > 4 else box for box in boxes]  # Take only first 4 points if more exist
-    return np.array(boxes, dtype=np.int16), scores
+#     # Ensure all boxes have the same shape before creating array
+#     boxes = [box[:4] if len(box) > 4 else box for box in boxes]  # Take only first 4 points if more exist
+#     return np.array(boxes, dtype=np.int16), scores
 
-def order_points(pts):
-    """Orders the corner points of a rectangle in clockwise order."""
-    rect = np.zeros((4, 2), dtype="float32")
+# def order_points(pts):
+#     """Orders the corner points of a rectangle in clockwise order."""
+#     rect = np.zeros((4, 2), dtype="float32")
 
-    # The top-left point will have the smallest sum, whereas
-    # the bottom-right point will have the largest sum
-    s = pts.sum(axis=1)
-    rect[0] = pts[np.argmin(s)]
-    rect[2] = pts[np.argmax(s)]
+#     # The top-left point will have the smallest sum, whereas
+#     # the bottom-right point will have the largest sum
+#     s = pts.sum(axis=1)
+#     rect[0] = pts[np.argmin(s)]
+#     rect[2] = pts[np.argmax(s)]
 
-    # Now, compute the difference between the points,
-    # the top-right point will have the smallest difference,
-    # whereas the bottom-left will have the largest difference
-    diff = np.diff(pts, axis=1)
-    rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmax(diff)]
+#     # Now, compute the difference between the points,
+#     # the top-right point will have the smallest difference,
+#     # whereas the bottom-left will have the largest difference
+#     diff = np.diff(pts, axis=1)
+#     rect[1] = pts[np.argmin(diff)]
+#     rect[3] = pts[np.argmax(diff)]
 
-    return rect.astype("int")
+#     return rect.astype("int")
 
-def decode_license_plate_ctc(rec_result, label_file):
-    """Decodes the recognition result using CTC principles."""
+# def decode_license_plate_ctc(rec_result, label_file):
+#     """Decodes the recognition result using CTC principles."""
 
-    print('In decode License plate module')
-    # print('rec_result size', rec_result.shape)
-    #print(rec_result)
-    predicted_indices = np.argmax(rec_result, axis=2)  # Get predicted indices
+#     print('In decode License plate module')
+#     # print('rec_result size', rec_result.shape)
+#     #print(rec_result)
+#     predicted_indices = np.argmax(rec_result, axis=2)  # Get predicted indices
 
-    # Load the label file
-    with open(label_file, 'r') as f:
-        labels = f.read().splitlines()
+#     # Load the label file
+#     with open(label_file, 'r') as f:
+#         labels = f.read().splitlines()
 
-    # Add the '<blank>' character to the labels (crucial for CTC)
-    labels = ['<blank>'] + labels
-    # print('label',len(labels))
+#     # Add the '<blank>' character to the labels (crucial for CTC)
+#     labels = ['<blank>'] + labels
+#     # print('label',len(labels))
 
-    decoded_text = []
-    # print('Predicted_indices', predicted_indices )
+#     decoded_text = []
+#     # print('Predicted_indices', predicted_indices )
 
-    for batch_idx in range(predicted_indices.shape[0]):  # Iterate through batch (1)
-        current_text = ""
-        previous_char_index = -1  # Initialize to an invalid index
+#     for batch_idx in range(predicted_indices.shape[0]):  # Iterate through batch (1)
+#         current_text = ""
+#         previous_char_index = -1  # Initialize to an invalid index
 
-        #for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
-        for i in range(predicted_indices.shape[1]):  # Iterate through sequence length (40)
-            char_index = predicted_indices[batch_idx, i].item()
+#         #for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
+#         for i in range(predicted_indices.shape[1]):  # Iterate through sequence length (40)
+#             char_index = predicted_indices[batch_idx, i].item()
 
-            if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
-                current_text += labels[char_index]
+#             if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
+#                 current_text += labels[char_index]
 
-            previous_char_index = char_index
+#             previous_char_index = char_index
 
-        decoded_text.append(current_text)
+#         decoded_text.append(current_text)
 
-    print('decoded text',decoded_text)
-    return decoded_text
+#     print('decoded text',decoded_text)
+#     return decoded_text
 
-def load_character_dict(file_path):
-    with open(file_path, 'r') as f:
-            # Read all lines and strip whitespace
-        characters = [line.strip() for line in f.readlines()]
-    return characters
+# def load_character_dict(file_path):
+#     with open(file_path, 'r') as f:
+#             # Read all lines and strip whitespace
+#         characters = [line.strip() for line in f.readlines()]
+#     return characters
 
-def min_max_scale(feature_map):
-    """Scales the feature map to the range [0, 1] using Min-Max scaling."""
-    min_val = np.min(feature_map)
-    max_val = np.max(feature_map)
+# def min_max_scale(feature_map):
+#     """Scales the feature map to the range [0, 1] using Min-Max scaling."""
+#     min_val = np.min(feature_map)
+#     max_val = np.max(feature_map)
 
-    if max_val == min_val:
-        # Handle the case where all values are the same
-        return np.zeros_like(feature_map)
+#     if max_val == min_val:
+#         # Handle the case where all values are the same
+#         return np.zeros_like(feature_map)
 
-    scaled_feature_map = (feature_map - min_val) / (max_val - min_val)
-    return scaled_feature_map
+#     scaled_feature_map = (feature_map - min_val) / (max_val - min_val)
+#     return scaled_feature_map
 
 
 class OvDetectorConfig(BaseDetectorConfig):
@@ -264,6 +264,8 @@ class OvDetector(DetectionApi):
         ModelTypeEnum.yolonas,
         ModelTypeEnum.yologeneric,
         ModelTypeEnum.yolox,
+        ModelTypeEnum.yolov8,
+        ModelTypeEnum.yolov11,
     ]
 
     def __init__(self, detector_config: OvDetectorConfig):
@@ -275,77 +277,77 @@ class OvDetector(DetectionApi):
         self.frame_counter = 0
         
         # Initialize human attribute model parameters
-        self.human_attr_enabled = detector_config.model.human_attr
-        if self.human_attr_enabled:
-            if not detector_config.model.human_attr_model_path:
-                logger.error("Human attribute model path not specified")
-                raise ValueError("human_attr_model_path is required when human_attr is enabled")
-            if not detector_config.model.human_attr_labelmap_path:
-                logger.error("Human attribute labelmap path not specified")
-                raise ValueError("human_attr_labelmap_path is required when human_attr is enabled")
-            self.human_attr_model = None  # Will be initialized when needed
+        # self.human_attr_enabled = detector_config.model.human_attr
+        # if self.human_attr_enabled:
+        #     if not detector_config.model.human_attr_model_path:
+        #         logger.error("Human attribute model path not specified")
+        #         raise ValueError("human_attr_model_path is required when human_attr is enabled")
+        #     if not detector_config.model.human_attr_labelmap_path:
+        #         logger.error("Human attribute labelmap path not specified")
+        #         raise ValueError("human_attr_labelmap_path is required when human_attr is enabled")
+        #     self.human_attr_model = None  # Will be initialized when needed
         
         self.h = detector_config.model.height
         self.w = detector_config.model.width
 
-        #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
-        self.tracked_objects = {}  # This can be managed by the tracker
-        self.processed_object_ids = set()
+        # #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
+        # self.tracked_objects = {}  # This can be managed by the tracker
+        # self.processed_object_ids = set()
 
-        #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
-        self.tracked_objects = {}  # This can be managed by the tracker
-        self.processed_object_ids = set()
-        self.frame_buffer = []
+        # #self.tracker = CentroidTracker(detector_config)  # Initialize the tracker
+        # self.tracked_objects = {}  # This can be managed by the tracker
+        # self.processed_object_ids = set()
+        # self.frame_buffer = []
 
-        # Initialize vehicle attribute model parameters
-        self.vehicle_attr_enabled = detector_config.model.vehicle_attr
-        if self.vehicle_attr_enabled:
-            if not detector_config.model.vehicle_attr_model_path:
-                logger.error("Vehicle attribute model path not specified")
-                raise ValueError("vehicle_attr_model_path is required when vehicle_attr is enabled")
-            if not detector_config.model.vehicle_attr_labelmap_path:
-                logger.error("Vehicle attribute labelmap path not specified")
-                raise ValueError("vehicle_attr_labelmap_path is required when vehicle_attr is enabled")
-            self.vehicle_attr_model = None  # Will be initialized when needed
-            self.processed_vehicle_ids = set()
+        # # Initialize vehicle attribute model parameters
+        # self.vehicle_attr_enabled = detector_config.model.vehicle_attr
+        # if self.vehicle_attr_enabled:
+        #     if not detector_config.model.vehicle_attr_model_path:
+        #         logger.error("Vehicle attribute model path not specified")
+        #         raise ValueError("vehicle_attr_model_path is required when vehicle_attr is enabled")
+        #     if not detector_config.model.vehicle_attr_labelmap_path:
+        #         logger.error("Vehicle attribute labelmap path not specified")
+        #         raise ValueError("vehicle_attr_labelmap_path is required when vehicle_attr is enabled")
+        #     self.vehicle_attr_model = None  # Will be initialized when needed
+        #     self.processed_vehicle_ids = set()
 
-        self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
-        if self.vehicle_alpr_enabled:
-            if not detector_config.model.vehicle_alpr_det_model_path:
-                logger.error("Vehicle alpr det model path not specified")
-                raise ValueError("vehicle_alpr_Det_model_path is required when vehicle_attr is enabled")
-            if not detector_config.model.vehicle_alpr_rec_model_path:
-                logger.error("Vehicle alpr rec model path not specified")
-                raise ValueError("vehicle_alpr_rec_model_path is required when vehicle_attr is enabled")
-            self.vehicle_alpr_model = None 
+        # self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
+        # if self.vehicle_alpr_enabled:
+        #     if not detector_config.model.vehicle_alpr_det_model_path:
+        #         logger.error("Vehicle alpr det model path not specified")
+        #         raise ValueError("vehicle_alpr_Det_model_path is required when vehicle_attr is enabled")
+        #     if not detector_config.model.vehicle_alpr_rec_model_path:
+        #         logger.error("Vehicle alpr rec model path not specified")
+        #         raise ValueError("vehicle_alpr_rec_model_path is required when vehicle_attr is enabled")
+        #     self.vehicle_alpr_model = None 
             
-        self.human_falling_enabled = detector_config.model.human_falling
-        if self.human_falling_enabled:
-            if not detector_config.model.human_falling_model_path:
-                logger.error("Human fall detection model path not specified")
-                raise ValueError("human_falling_model_path is needed to detect falling")
-            self.human_falling_model = None 
+        # self.human_falling_enabled = detector_config.model.human_falling
+        # if self.human_falling_enabled:
+        #     if not detector_config.model.human_falling_model_path:
+        #         logger.error("Human fall detection model path not specified")
+        #         raise ValueError("human_falling_model_path is needed to detect falling")
+        #     self.human_falling_model = None 
 
-        self.human_fighting_enabled = detector_config.model.human_fighting
-        if self.human_fighting_enabled:
-            if not detector_config.model.human_fighting_model_path:
-                logger.error("Human fight detection model path not specified")
-                raise ValueError("human_fighting_model_path is needed to detect fighting")
-            self.human_fighting_model = None 
+        # self.human_fighting_enabled = detector_config.model.human_fighting
+        # if self.human_fighting_enabled:
+        #     if not detector_config.model.human_fighting_model_path:
+        #         logger.error("Human fight detection model path not specified")
+        #         raise ValueError("human_fighting_model_path is needed to detect fighting")
+        #     self.human_fighting_model = None 
 
-        self.human_calling_enabled = detector_config.model.human_calling
-        if self.human_calling_enabled:
-            if not detector_config.model.human_calling_model_path:
-                logger.error("Human call detection model path not specified")
-                raise ValueError("human_calling_model_path is needed to detect calling")
-            self.human_calling_model = None 
+        # self.human_calling_enabled = detector_config.model.human_calling
+        # if self.human_calling_enabled:
+        #     if not detector_config.model.human_calling_model_path:
+        #         logger.error("Human call detection model path not specified")
+        #         raise ValueError("human_calling_model_path is needed to detect calling")
+        #     self.human_calling_model = None 
 
-        self.human_smoking_enabled = detector_config.model.human_smoking
-        if self.human_smoking_enabled:
-            if not detector_config.model.human_smoking_model_path:
-                logger.error("Human smoking detection model path not specified")
-                raise ValueError("human_smoking_model_path is needed to detect smoking")
-            self.human_smoking_model = None 
+        # self.human_smoking_enabled = detector_config.model.human_smoking
+        # if self.human_smoking_enabled:
+        #     if not detector_config.model.human_smoking_model_path:
+        #         logger.error("Human smoking detection model path not specified")
+        #         raise ValueError("human_smoking_model_path is needed to detect smoking")
+        #     self.human_smoking_model = None 
          
         if not os.path.isfile(detector_config.model.path):
             logger.error(f"OpenVino model file {detector_config.model.path} not found.")
@@ -629,468 +631,11 @@ class OvDetector(DetectionApi):
                         float(detections[i][5])
                     ],
                 })
-            print('Formatted_detections', formatted_detections)
+            # print('Formatted_detections', formatted_detections)
 
-            print('Detections', detections)
+            # print('Detections', detections)
 
-            # Process human attributes if enabled
-            if self.human_attr_enabled:
-                # Get human attribute model parameters
-                human_attr_model_path = self.detector_config.model.human_attr_model_path
-                human_attr_labelmap_path = self.detector_config.model.human_attr_labelmap_path
-                human_attr_width = self.detector_config.model.human_attr_width
-                human_attr_height = self.detector_config.model.human_attr_height
-                human_attr_show_label = self.detector_config.model.human_attr_show_label
-
-                # Initialize the human attribute model if it hasn't been done yet
-                if not hasattr(self, 'human_attr_model') or self.human_attr_model is None:
-                    try:
-                        logger.info("Initializing human attribute model...")
-                        self.human_attr_model = ov.Core().compile_model(human_attr_model_path, "CPU")
-                        logger.info("Human attribute model initialized successfully")
-                    except Exception as e:
-                        logger.error(f"Failed to initialize human attribute model: {e}")
-                        self.human_attr_model = None  # Ensure it remains None if initialization fails
-
-                if self.human_attr_model is None:
-                    logger.error("Human attribute model is not initialized. Cannot create infer request.")
-                    return  # or handle the error appropriately
-
-                # Filter person detections (class 0) from formatted_detections
-                person_detections = [d for d in formatted_detections if d['label'] == 0]
-                #print(f"Current frame number: {self.frame_counter}")
-                print('person_detections', person_detections)
-
-                for detection in person_detections:
-                    print("Processing human attributes")
-                    y_min, x_min, y_max, x_max = detection["box"]
-                    
-                    tensor_input_np = np.array(tensor_input)
-                    image_to_save = tensor_input_np[0]
-                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
-                                       int(x_min * 640):int(x_max * 640)]
-                    resized_crop = cv2.resize(crop, (human_attr_width, human_attr_height))
-                    processed_crop = resized_crop.transpose(2, 0, 1).astype(np.float32) / 255.0
-                    processed_crop = np.expand_dims(processed_crop, axis=0)
-
-                    infer_request = self.human_attr_model.create_infer_request()
-                    infer_request.set_input_tensor(ov.Tensor(processed_crop))
-                    infer_request.infer()
-                    image_attr = infer_request.get_output_tensor(0).data
-
-                    detected_labels = []
-                    confidence_intervals = []
-                    bounding_boxes = [x_min, y_min, x_max, y_max]
-                    scores = image_attr.flatten()
-                    for i, score in enumerate(scores):
-                        if score > 0.6:
-                            detected_labels.append(load_labels(human_attr_labelmap_path)[i])
-                            confidence_intervals.append(score)
-
-                    # if human_attr_show_label:
-                    #     draw_box_with_label(
-                    #         tensor_input,
-                    #         int(x_min * 640),
-                    #         int(y_min * 640),
-                    #         int(x_max * 640),
-                    #         int(y_max * 640),
-                    #         label=detected_labels,
-                    #         info="",
-                    #         thickness=2,
-                    #         color=(0, 255, 0),
-                    #         position="ul"
-                    #     )
-
-                    save_cropped_images_and_write_csv(
-                        crop, 
-                        detected_labels, 
-                        confidence_intervals, 
-                        bounding_boxes, 
-                        frame_number=self.frame_counter,
-                        frame_time=current_time
-                    )
             
-            # Process vehicle attributes if enabled
-            if self.vehicle_attr_enabled:
-                # Get vehicle attribute model parameters
-                vehicle_attr_model_path = self.detector_config.model.vehicle_attr_model_path
-                vehicle_attr_labelmap_path = self.detector_config.model.vehicle_attr_labelmap_path
-                vehicle_attr_width = self.detector_config.model.vehicle_attr_width
-                vehicle_attr_height = self.detector_config.model.vehicle_attr_height
-                vehicle_attr_show_label = self.detector_config.model.vehicle_attr_show_label
-
-                # Filter vehicle detections (class 2 for car) from formatted_detections
-                vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
-                #print(f"Current frame number: {self.frame_counter}")
-                #print('vehicle_detections', vehicle_detections)
-
-                for detection in vehicle_detections:
-                    print("Processing vehicle attributes")
-                    y_min, x_min, y_max, x_max = detection["box"]
-                    
-                    tensor_input_np = np.array(tensor_input)
-                    image_to_save = tensor_input_np[0]  # Already in RGB format
-                    
-                    # Crop the vehicle region
-                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
-                                       int(x_min * 640):int(x_max * 640)]
-                    crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                    
-                    # Resize to model's expected dimensions (192x256)
-                    resized_crop = cv2.resize(crop, (256, 192))  # width=256, height=192
-
-                    # Convert to NCHW format and normalize
-                    #processed_crop = resized_crop.transpose(2, 0, 1)  # HWC to CHW
-                    processed_crop = resized_crop.astype(np.float32) / 255.0
-                        # Normalize with mean and std
-                    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                    processed_crop = (processed_crop - mean) / std
-                    processed_crop = np.transpose(processed_crop, (2, 0, 1))  # HWC to CHW
-                    processed_crop = np.expand_dims(processed_crop, axis=0)
-
-                    if self.vehicle_attr_model is None:
-                        try:
-                            print("Initializing vehicle attribute model...")
-                            self.vehicle_attr_model = ov.Core().compile_model(vehicle_attr_model_path, "CPU")
-                            print("Vehicle attribute model initialized successfully")
-                        except Exception as e:
-                            logger.error(f"Failed to initialize vehicle attribute model: {e}")
-                            continue
-                            
-                    vehicle_attr_labels = load_labels(vehicle_attr_labelmap_path)
-                    
-                    infer_request = self.vehicle_attr_model.create_infer_request()
-                    infer_request.set_input_tensor(ov.Tensor(processed_crop))
-                    infer_request.infer()
-                    vehicle_attr = infer_request.get_output_tensor(0).data
-
-                    scores = vehicle_attr.flatten()
-                    #print('vehicle CI', scores)
-                    # First 10 labels are colors, next 9 are makes
-
-                    color_probs = scores[:10]
-                    color_idx = np.argmax(color_probs)
-                    color_score = color_probs[color_idx]
-                    
-                    type_probs = scores[10:]
-                    type_idx = np.argmax(type_probs)
-                    type_score = type_probs[type_idx]
-
-                    
-                    detected_labels = []
-                    confidence_intervals = []
-
-                    detected_labels.append(vehicle_attr_labels[color_idx])
-                    confidence_intervals.append(float(color_score))
-
-                    detected_labels.append(vehicle_attr_labels[type_idx+10])
-                    confidence_intervals.append(float(type_score))
-
-                    bounding_boxes = [x_min, y_min, x_max, y_max]
-
-                    if vehicle_attr_show_label:
-                        draw_box_with_label(
-                            tensor_input,
-                            int(x_min * 640),
-                            int(y_min * 640),
-                            int(x_max * 640),
-                            int(y_max * 640),
-                            label=detected_labels,
-                            info="",
-                            thickness=2,
-                            color=(255, 0, 0),
-                            position="ul"
-                        )
-
-                    save_cropped_images_and_write_csv(
-                        crop, 
-                        detected_labels, 
-                        confidence_intervals, 
-                        bounding_boxes, 
-                        frame_number=self.frame_counter,
-                        frame_time=current_time,
-                        output_dir="/media/frigate/vehicle_crops",
-                        output_file="vehicle_attributes.csv"
-                    )
-
-            if self.vehicle_alpr_enabled:
-                vehicle_detections = [d for d in formatted_detections if d['label'] == 2]
-                print('In ALPR module')
-
-                if not vehicle_detections:
-                    return detections
-                
-                vehicle_alpr_det_model_path = self.detector_config.model.vehicle_alpr_det_model_path
-                vehicle_alpr_rec_model_path = self.detector_config.model.vehicle_alpr_rec_model_path
-                vehicle_rec_labelmap_path = self.detector_config.model.vehicle_rec_labelmap_path
-
-                self.vehicle_alpr_det_model = ov.Core().compile_model(vehicle_alpr_det_model_path, "CPU")
-
-                self.vehicle_alpr_rec_model = ov.Core().compile_model(vehicle_alpr_rec_model_path, "CPU")
-
-                for detection in vehicle_detections:
-                    
-                    y_min, x_min, y_max, x_max = detection["box"]
-                    
-                    tensor_input_np = np.array(tensor_input)
-                    image_to_save = tensor_input_np[0]  # Already in RGB format
-                    
-                    crop = image_to_save[int(y_min * 640):int(y_max * 640), 
-                                    int(x_min * 640):int(x_max * 640)]
-
-                    crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                    image = cv2.resize(crop, (640, 640))
-                    image = image.astype(np.float32)
-                    image /= 255.0
-                    image = np.transpose(image, (2, 0, 1))
-                    preprocessed_image = np.expand_dims(image, axis=0)
-
-                    infer_request = self.vehicle_alpr_det_model.create_infer_request()
-                    infer_request.set_input_tensor(ov.Tensor(preprocessed_image))
-                    infer_request.infer()
-
-                    det_result = infer_request.get_output_tensor(0).data
-                    det_minmax = min_max_scale(det_result[0])
-                    det_boxes, det_confidences = post_process_detections(det_minmax.squeeze(0))
-                    
-                    for box, confidence in zip(det_boxes, det_confidences):                        
-                        # Confidence threshold
-                        if confidence < 0.4:  # Adjust threshold as needed
-                            continue
-
-                        ordered_box = order_points(box)
-                        x_min = np.min(ordered_box[:, 0])
-                        y_min = np.min(ordered_box[:, 1])
-                        x_max = np.max(ordered_box[:, 0])
-                        y_max = np.max(ordered_box[:, 1])
-
-
-                        rect_width = int(np.linalg.norm(ordered_box[1] - ordered_box[0]))
-                        rect_height = int(np.linalg.norm(ordered_box[0] - ordered_box[3]))
-
-                        # print('rect_width',rect_width)
-                        # print('rect_height', rect_height)
-                        # if rect_width < 10 or rect_height < 5:  # Adjust minimum size
-                        #     continue
-                        # if rect_width / rect_height < 1 or rect_width / rect_height > 6: # adjust aspect ratio
-                        #     continue
-
-                        # if x_min >= x_max or y_min >= y_max: # check for valid dimensions.
-                        #     continue
-
-                        cropped_image = preprocessed_image[0, :, int(y_min):int(y_max), int(x_min):int(x_max)]
-                        cropped_image = np.transpose(cropped_image, (1, 2, 0))
-                        
-                        if (rect_height) and (rect_width) != 0:
-                            if (rect_width / rect_height) > 1:
-                                if cropped_image.size != 0:
-                                
-                                    resized_image = cv2.resize(cropped_image, (320, 48))
-                                    resized_image = np.transpose(resized_image, (2, 0, 1))
-                                    resized_image = np.expand_dims(resized_image, axis=0)
-
-                                    infer_request = self.vehicle_alpr_rec_model.create_infer_request()
-                                    infer_request.set_input_tensor(ov.Tensor(resized_image))
-                                    infer_request.infer()
-                                    rec_result = infer_request.get_output_tensor(0).data
-                                    rec_result = np.array(rec_result)
-
-                                    license_plate_string = decode_license_plate_ctc(rec_result, vehicle_rec_labelmap_path)
-
-                                    save_cropped_images_and_write_csv(
-                                        crop, 
-                                        license_plate_string, 
-                                        confidence, 
-                                        ordered_box, 
-                                        frame_number=self.frame_counter,
-                                        frame_time=current_time,
-                                        output_dir="/media/frigate/vehicle_alpr_crops",
-                                        output_file="vehicle_ALPR.csv"
-                                    )
-
-            if self.human_falling_enabled:
-                print('In fall detector')
-
-                # person_detections = [d for d in formatted_detections if d['label'] == 0]
-
-                # if not person_detections:
-                #     return detections
-
-                human_falling_model_path = self.detector_config.model.human_falling_model_path
-                self.human_falling_model = ov.Core().compile_model(human_falling_model_path, "CPU")
-
-                tensor_input_np = np.array(tensor_input)
-                crop = tensor_input_np[0]
-                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (320, 320))
-                frame = frame.astype(np.float32) / 255.0
-                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                frame = (frame - mean) / std
-                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
-
-                self.frame_buffer.append(preprocessed_frame)
-                print('frame buffer length' , len(self.frame_buffer))
-
-                if len(self.frame_buffer) == 8: # Process a batch of 8 frames
-                    print('In Fall detection if clause')
-                    input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
-                    input_data = np.expand_dims(input_data, axis=0) # (N=1, T=8, C, H, W)
-
-                    infer_request = self.human_falling_model.create_infer_request()
-                    infer_request.set_input_tensor(ov.Tensor(input_data))
-                    infer_request.infer()
-
-                    fall_detection = infer_request.get_output_tensor(0).data
-
-                    # Process the output for this batch of 8 frames
-                    output = fall_detection.flatten() # Assuming the output is flattened
-                    output = softmax(output)
-                    top_k = 1
-                    classes_indices = np.argpartition(output, -top_k)[-top_k:]
-                    classes_indices = classes_indices[np.argsort(-output[classes_indices])]
-                    scores = output[classes_indices]
-                    labels = ["Not Falling", "Falling"]
-
-                    predicted_label = labels[classes_indices[0]]
-                    confidence = scores[0]
-                    self.frame_buffer = [];
-                    print('classes_indices', classes_indices[0])
-                    if classes_indices[0] == 1:
-                        print('Inside class_index 1')
-                        save_cropped_images_and_write_csv(
-                                        crop, 
-                                        predicted_label, 
-                                        confidence, 
-                                        #detections["box"], 
-                                        [],
-                                        frame_number=self.frame_counter,
-                                        frame_time=current_time,
-                                        output_dir="/media/frigate/falling_crops",
-                                        output_file="Falling_det.csv"
-                                    )
-                        
-            if self.human_fighting_enabled:
-                print('In fight detector')
-
-                # person_detections = [d for d in formatted_detections if d['label'] == 0]
-
-                # if not person_detections:
-                #     return detections
-
-                human_fighting_model_path = self.detector_config.model.human_fighting_model_path
-                self.human_fighting_model = ov.Core().compile_model(human_fighting_model_path, "CPU")
-
-                tensor_input_np = np.array(tensor_input)
-                crop = tensor_input_np[0]
-                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (320, 320))
-                frame = frame.astype(np.float32) / 255.0
-                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                frame = (frame - mean) / std
-                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
-
-                self.frame_buffer.append(preprocessed_frame)
-                print('frame buffer length' , len(self.frame_buffer))
-
-                if len(self.frame_buffer) == 8: # Process a batch of 8 frames
-                    print('In fight detection if clause')
-                    input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
-                    input_data = np.expand_dims(input_data, axis=0) # (N=1, T=8, C, H, W)
-
-                    infer_request = self.human_fighting_model.create_infer_request()
-                    infer_request.set_input_tensor(ov.Tensor(input_data))
-                    infer_request.infer()
-
-                    fight_detection = infer_request.get_output_tensor(0).data
-
-                    # Process the output for this batch of 8 frames
-                    output = fight_detection.flatten() # Assuming the output is flattened
-                    output = softmax(output)
-                    top_k = 1
-                    classes_indices = np.argpartition(output, -top_k)[-top_k:]
-                    classes_indices = classes_indices[np.argsort(-output[classes_indices])]
-                    scores = output[classes_indices]
-                    labels = ["Not Fighting", "Fighting"]
-
-                    predicted_label = labels[classes_indices[0]]
-                    confidence = scores[0]
-                    self.frame_buffer = [];
-                    print('classes_indices', classes_indices[0])
-                    if classes_indices[0] == 1:
-                        print('Inside class_index 1')
-                        save_cropped_images_and_write_csv(
-                                        crop, 
-                                        predicted_label, 
-                                        confidence, 
-                                        #detections["box"], 
-                                        [],
-                                        frame_number=self.frame_counter,
-                                        frame_time=current_time,
-                                        output_dir="/media/frigate/fighting_crops",
-                                        output_file="Fighting_det.csv"
-                                    )
-
-            if self.human_calling_enabled:
-                print('In Calling detector')
-
-                # person_detections = [d for d in formatted_detections if d['label'] == 0]
-
-                # if not person_detections:
-                #     return detections
-
-                human_calling_model_path = self.detector_config.model.human_calling_model_path
-                self.human_calling_model = ov.Core().compile_model(human_calling_model_path, "CPU")
-
-                tensor_input_np = np.array(tensor_input)
-                crop = tensor_input_np[0]
-                frame = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (224, 224))
-                frame = frame.astype(np.float32) / 255.0
-                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                frame = (frame - mean) / std
-                preprocessed_frame = np.transpose(frame, (2, 0, 1)) 
-
-                    
-                #input_data = np.stack(self.frame_buffer, axis=0) # (T=8, C, H, W)
-                input_data = np.expand_dims(preprocessed_frame, axis=0) # (N=1, T=8, C, H, W)
-
-                infer_request = self.human_calling_model.create_infer_request()
-                infer_request.set_input_tensor(ov.Tensor(input_data))
-                infer_request.infer()
-
-                calling_detection = infer_request.get_output_tensor(0).data
-
-                # Process the output for this batch of 8 frames
-                output = calling_detection.flatten() # Assuming the output is flattened
-                output = softmax(output)
-                top_k = 1
-                classes_indices = np.argpartition(output, -top_k)[-top_k:]
-                classes_indices = classes_indices[np.argsort(-output[classes_indices])]
-                scores = output[classes_indices]
-                labels = ["Not Calling", "Calling"]
-
-                predicted_label = labels[classes_indices[0]]
-                confidence = scores[0]
-                self.frame_buffer = [];
-                print('classes_indices', classes_indices[0])
-                if classes_indices[0] == 1:
-                    print('Inside class_index 1')
-                    save_cropped_images_and_write_csv(
-                                    crop, 
-                                    predicted_label, 
-                                    confidence, 
-                                    #detections["box"], 
-                                    [],
-                                    frame_number=self.frame_counter,
-                                    frame_time=current_time,
-                                    output_dir="/media/frigate/Calling_crops",
-                                    output_file="Calling_det.csv"
-                                )
-          
             return detections
         
         elif self.ov_model_type == ModelTypeEnum.yolov5:

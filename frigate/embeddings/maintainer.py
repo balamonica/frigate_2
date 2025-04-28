@@ -42,6 +42,8 @@ from frigate.data_processing.post.license_plate import (
 )
 from frigate.data_processing.real_time.api import RealTimeProcessorApi
 from frigate.data_processing.real_time.bird import BirdRealTimeProcessor
+from frigate.data_processing.real_time.human_attr import HumanAttrDetection
+
 from frigate.data_processing.real_time.face import FaceRealTimeProcessor
 from frigate.data_processing.real_time.license_plate import (
     LicensePlateRealTimeProcessor,
@@ -127,6 +129,13 @@ class EmbeddingMaintainer(threading.Thread):
         if self.config.classification.bird.enabled:
             self.realtime_processors.append(
                 BirdRealTimeProcessor(
+                    self.config, self.event_metadata_publisher, metrics
+                )
+            )
+        
+        if self.config.classification.human_attr.enabled:
+            self.realtime_processors.append(
+                HumanAttrRealTimeProcessor(
                     self.config, self.event_metadata_publisher, metrics
                 )
             )

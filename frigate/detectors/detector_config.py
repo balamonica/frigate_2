@@ -42,6 +42,8 @@ class ModelTypeEnum(str, Enum):
     yolox = "yolox"
     yolonas = "yolonas"
     yologeneric = "yolo-generic"
+    yolov8 = "yolov8"
+    yolov11 = "yolov11"
 
 
 class ModelConfig(BaseModel):
@@ -71,41 +73,41 @@ class ModelConfig(BaseModel):
         default=ModelTypeEnum.ssd, title="Object Detection Model Type"
     )
     
-    # Human attribute detection parameters
-    human_attr: bool = Field(default=False, title="Enable human attribute detection")
-    human_attr_model_path: Optional[str] = Field(None, title="Human Attribute Detection model path.")
-    human_attr_labelmap_path: Optional[str] = Field(None, title="Label map for human attribute detector.")
-    human_attr_width: int = Field(default=192, title="Human Attribute Detection model input width.")
-    human_attr_height: int = Field(default=256, title="Human Attribute Detection model input height.")
-    human_attr_show_label: bool = Field(default=True, title="Show human attribute labels in the UI.")
+#     # Human attribute detection parameters
+#     human_attr: bool = Field(default=False, title="Enable human attribute detection")
+#     human_attr_model_path: Optional[str] = Field(None, title="Human Attribute Detection model path.")
+#     human_attr_labelmap_path: Optional[str] = Field(None, title="Label map for human attribute detector.")
+#     human_attr_width: int = Field(default=192, title="Human Attribute Detection model input width.")
+#     human_attr_height: int = Field(default=256, title="Human Attribute Detection model input height.")
+#     human_attr_show_label: bool = Field(default=True, title="Show human attribute labels in the UI.")
     
-    # Vehicle attribute detection parameters
-    vehicle_attr: bool = Field(default=False, title="Enable vehicle attribute detection")
-    vehicle_attr_model_path: Optional[str] = Field(None, title="Vehicle Attribute Detection model path.")
-    vehicle_attr_labelmap_path: Optional[str] = Field(None, title="Label map for vehicle attribute detector.")
-    vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
-    vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
-    vehicle_attr_show_label: bool = Field(default=True, title="Show vehicle attribute labels in the UI.")
+#     # Vehicle attribute detection parameters
+#     vehicle_attr: bool = Field(default=False, title="Enable vehicle attribute detection")
+#     vehicle_attr_model_path: Optional[str] = Field(None, title="Vehicle Attribute Detection model path.")
+#     vehicle_attr_labelmap_path: Optional[str] = Field(None, title="Label map for vehicle attribute detector.")
+#     vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
+#     vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
+#     vehicle_attr_show_label: bool = Field(default=True, title="Show vehicle attribute labels in the UI.")
     
-   # Vehicle ALPR detection parameters
-    vehicle_alpr: bool = Field(default=False, title="Enable vehicle License plate detection")
-    vehicle_alpr_det_model_path: Optional[str] = Field(None, title="Vehicle ALPR Detection model path.")
-    vehicle_alpr_rec_model_path: Optional[str] = Field(None, title="Vehicle ALPR Recognition model path.")
-    vehicle_rec_labelmap_path: Optional[str] = Field(None, title="Label map for vehicle attribute detector.")
-    #vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
-    #vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
+#    # Vehicle ALPR detection parameters
+#     vehicle_alpr: bool = Field(default=False, title="Enable vehicle License plate detection")
+#     vehicle_alpr_det_model_path: Optional[str] = Field(None, title="Vehicle ALPR Detection model path.")
+#     vehicle_alpr_rec_model_path: Optional[str] = Field(None, title="Vehicle ALPR Recognition model path.")
+#     vehicle_rec_labelmap_path: Optional[str] = Field(None, title="Label map for vehicle attribute detector.")
+#     #vehicle_attr_width: int = Field(default=192, title="Vehicle Attribute Detection model input width.")
+#     #vehicle_attr_height: int = Field(default=256, title="Vehicle Attribute Detection model input height.")
     
-    human_fighting: bool = Field(default=False, title="Enable human fighting detection")
-    human_fighting_model_path: Optional[str] = Field(None, title="Human fighting model path")
+#     human_fighting: bool = Field(default=False, title="Enable human fighting detection")
+#     human_fighting_model_path: Optional[str] = Field(None, title="Human fighting model path")
 
-    human_calling: bool = Field(default=False, title="Enable human calling detection")
-    human_calling_model_path: Optional[str] = Field(None, title="Human calling model path")
+#     human_calling: bool = Field(default=False, title="Enable human calling detection")
+#     human_calling_model_path: Optional[str] = Field(None, title="Human calling model path")
 
-    human_falling: bool = Field(default=False, title="Enable human falling detection")
-    human_falling_model_path: Optional[str] = Field(None, title="Human falling model path")
+#     human_falling: bool = Field(default=False, title="Enable human falling detection")
+#     human_falling_model_path: Optional[str] = Field(None, title="Human falling model path")
 
-    human_smoking: bool = Field(default=False, title="Enable human smoking detection")
-    human_smoking_model_path: Optional[str] = Field(None, title="Human smoking model path")   
+#     human_smoking: bool = Field(default=False, title="Enable human smoking detection")
+#     human_smoking_model_path: Optional[str] = Field(None, title="Human smoking model path")   
 
     _merged_labelmap: Optional[Dict[int, str]] = PrivateAttr()
     _colormap: Dict[int, Tuple[int, int, int]] = PrivateAttr()
@@ -139,44 +141,44 @@ class ModelConfig(BaseModel):
 
     def __init__(self, **config):
         super().__init__(**config)
-        if self.model_type == ModelTypeEnum.yolov11_humanattr:
-            # Read the human attribute model parameters
-            self.human_attr = config.get("human_attr", False)
-            self.human_attr_model_path = config.get("human_attr_model_path", None)
-            self.human_attr_labelmap_path = config.get("human_attr_labelmap_path", None)
-            self.human_attr_width = config.get("human_attr_width", 192)
-            self.human_attr_height = config.get("human_attr_height", 256)
-            self.human_attr_show_label = config.get("human_attr_show_label", True)
+        # if self.model_type == ModelTypeEnum.yolov11_humanattr:
+        #     # Read the human attribute model parameters
+        #     self.human_attr = config.get("human_attr", False)
+        #     self.human_attr_model_path = config.get("human_attr_model_path", None)
+        #     self.human_attr_labelmap_path = config.get("human_attr_labelmap_path", None)
+        #     self.human_attr_width = config.get("human_attr_width", 192)
+        #     self.human_attr_height = config.get("human_attr_height", 256)
+        #     self.human_attr_show_label = config.get("human_attr_show_label", True)
             
-            # Read the vehicle attribute model parameters
-            self.vehicle_attr = config.get("vehicle_attr", False)
-            self.vehicle_attr_model_path = config.get("vehicle_attr_model_path", None)
-            self.vehicle_attr_labelmap_path = config.get("vehicle_attr_labelmap_path", None)
-            self.vehicle_attr_width = config.get("vehicle_attr_width", 192)
-            self.vehicle_attr_height = config.get("vehicle_attr_height", 256)
-            self.vehicle_attr_show_label = config.get("vehicle_attr_show_label", True)
+        #     # Read the vehicle attribute model parameters
+        #     self.vehicle_attr = config.get("vehicle_attr", False)
+        #     self.vehicle_attr_model_path = config.get("vehicle_attr_model_path", None)
+        #     self.vehicle_attr_labelmap_path = config.get("vehicle_attr_labelmap_path", None)
+        #     self.vehicle_attr_width = config.get("vehicle_attr_width", 192)
+        #     self.vehicle_attr_height = config.get("vehicle_attr_height", 256)
+        #     self.vehicle_attr_show_label = config.get("vehicle_attr_show_label", True)
 
-            #Read the  vehile ALPR parameters
-            self.vehicle_alpr = config.get("vehicle_alpr", False)
-            self.vehicle_alpr_det_model_path = config.get("vehicle_alpr_det_model_path", None)
-            self.vehicle_alpr_rec_model_path = config.get("vehicle_alpr_rec_model_path", None)
-            self.vehicle_rec_labelmap_path = config.get("vehicle_rec_labelmap_path", None)
+        #     #Read the  vehile ALPR parameters
+        #     self.vehicle_alpr = config.get("vehicle_alpr", False)
+        #     self.vehicle_alpr_det_model_path = config.get("vehicle_alpr_det_model_path", None)
+        #     self.vehicle_alpr_rec_model_path = config.get("vehicle_alpr_rec_model_path", None)
+        #     self.vehicle_rec_labelmap_path = config.get("vehicle_rec_labelmap_path", None)
 
-            #Read the human falling parameters
-            self.human_falling = config.get("human_falling", False)
-            self.human_falling_model_path = config.get("human_falling_model_path", None)
+        #     #Read the human falling parameters
+        #     self.human_falling = config.get("human_falling", False)
+        #     self.human_falling_model_path = config.get("human_falling_model_path", None)
 
-            #Read the human calling parameters
-            self.human_calling = config.get("human_calling", False)
-            self.human_calling_model_path = config.get("human_calling_model_path", None)
+        #     #Read the human calling parameters
+        #     self.human_calling = config.get("human_calling", False)
+        #     self.human_calling_model_path = config.get("human_calling_model_path", None)
 
-            #Read the human fighting parameters
-            self.human_fighting = config.get("human_fighting", False)
-            self.human_fighting_model_path = config.get("human_fighting_model_path", None)
+        #     #Read the human fighting parameters
+        #     self.human_fighting = config.get("human_fighting", False)
+        #     self.human_fighting_model_path = config.get("human_fighting_model_path", None)
 
-            #Read the human smoking parameters
-            self.human_smoking = config.get("human_smoking", False)
-            self.human_smoking_model_path = config.get("human_smoking_model_path", None)
+        #     #Read the human smoking parameters
+        #     self.human_smoking = config.get("human_smoking", False)
+        #     self.human_smoking_model_path = config.get("human_smoking_model_path", None)
 
         self._merged_labelmap = {
             **load_labels(config.get("labelmap_path", "/labelmap.txt")),

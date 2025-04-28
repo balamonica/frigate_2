@@ -33,12 +33,31 @@ class BirdClassificationConfig(FrigateBaseModel):
         le=1.0,
     )
 
+class HumanattrClassificationConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Enable human attribute detection.")
+    threshold: float = Field(
+        default=0.6,
+        title="Minimum classification score required for the attributes",
+        gt=0.0,
+        le=1.0,
+    )
+    human_attr_model_path: str = Field(
+        default="/models/human_attr/human_attr.onnx",  # Set a sensible default path
+        title="Path to the human attribute detection model."
+    )
+    human_attr_label_path: str = Field(
+        default="/models/human_attr/attr_labels.txt",  # Set a sensible default path
+        title="Path to the human attribute detection labels."
+    )
+
 
 class ClassificationConfig(FrigateBaseModel):
     bird: BirdClassificationConfig = Field(
         default_factory=BirdClassificationConfig, title="Bird classification config."
     )
-
+    human_attr: HumanattrClassificationConfig = Field(
+        default_factory=HumanattrClassificationConfig, title="Human attr classification config."
+    )
 
 class SemanticSearchConfig(FrigateBaseModel):
     enabled: bool = Field(default=False, title="Enable semantic search.")
