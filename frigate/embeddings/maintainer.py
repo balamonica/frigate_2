@@ -42,7 +42,7 @@ from frigate.data_processing.post.license_plate import (
 )
 from frigate.data_processing.real_time.api import RealTimeProcessorApi
 from frigate.data_processing.real_time.bird import BirdRealTimeProcessor
-from frigate.data_processing.real_time.human_attr import HumanAttrDetection
+from frigate.data_processing.real_time.human_attr import HumanAttrRealTimeProcessor
 
 from frigate.data_processing.real_time.face import FaceRealTimeProcessor
 from frigate.data_processing.real_time.license_plate import (
@@ -107,7 +107,7 @@ class EmbeddingMaintainer(threading.Thread):
         self.frame_manager = SharedMemoryFrameManager()
 
         self.detected_license_plates: dict[str, dict[str, any]] = {}
-
+        print('debug', self.config.classification.bird.enabled)
         # model runners to share between realtime and post processors
         if self.config.lpr.enabled:
             lpr_model_runner = LicensePlateModelRunner(
@@ -127,6 +127,7 @@ class EmbeddingMaintainer(threading.Thread):
             )
 
         if self.config.classification.bird.enabled:
+            print('in embedding>maintainer.py bird section')
             self.realtime_processors.append(
                 BirdRealTimeProcessor(
                     self.config, self.event_metadata_publisher, metrics
@@ -134,6 +135,7 @@ class EmbeddingMaintainer(threading.Thread):
             )
         
         if self.config.classification.human_attr.enabled:
+            print('in embedding>maintainer.py human_attr section')
             self.realtime_processors.append(
                 HumanAttrRealTimeProcessor(
                     self.config, self.event_metadata_publisher, metrics

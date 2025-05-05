@@ -24,232 +24,6 @@ logger = logging.getLogger(__name__)
 DETECTOR_KEY = "openvino"
 
 
-# def softmax(x):
-#     """Compute softmax values for each sets of scores in x."""
-#     e_x = np.exp(x - np.max(x))
-#     return e_x / e_x.sum()
-
-# def unclip_cv2(box, unclip_ratio):
-#     """Unclips the bounding box using cv2 dilation."""
-#     distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
-    
-#     # Create a mask
-#     mask = np.zeros((640, 640), dtype=np.uint8) # adjust image size as needed.
-#     cv2.fillPoly(mask, [box.astype(np.int32)], 255)
-
-#     # Dilate the mask
-#     kernel_size = int(distance)
-#     if kernel_size < 1:
-#         kernel_size = 1
-#     kernel = np.ones((kernel_size, kernel_size), np.uint8)
-#     dilated_mask = cv2.dilate(mask, kernel, iterations=1)
-
-#     # Find contours
-#     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-#     # Convert to NumPy array
-#     if contours:
-#         expanded = contours[0].reshape(-1, 2)
-#         return expanded
-#     else:
-#         return box #return the original box if no contour found.
-
-# def save_cropped_images_and_write_csv(crop, detected_labels, confidence_intervals, bounding_boxes, frame_number, frame_time, output_dir="/media/frigate/cropped_images", output_file="human_attributes.csv"):
-#     # Ensure the output directory exists
-#     os.makedirs(output_dir, exist_ok=True)
-#     counter2= random.randint(1,20)
-#     # Convert the image to BGR format
-#     crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
-
-#     # Create a filename with both timestamp and frame number
-#     timestamp = time.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
-#     cropped_image_filename = f"frame_{frame_number}_time_{timestamp}_{counter2}.jpg"
-#     cropped_image_path = os.path.join(output_dir, cropped_image_filename)
-
-#     # Save the cropped image in BGR format
-#     cv2.imwrite(cropped_image_path, crop_bgr)
-
-#     # Prepare the data for the DataFrame
-#     data = {
-#         "Image Name": cropped_image_filename,
-#         "Frame Number": frame_number,
-#         "Frame Time": frame_time,
-#         "Detected Labels": [detected_labels],
-#         "Confidence Intervals": [confidence_intervals],
-#         "Bounding Box": [bounding_boxes]
-#     }
-
-#     # Create a DataFrame from the collected data
-#     df = pd.DataFrame(data)
-
-#     # Write the DataFrame to a CSV file
-#     csv_output_path = os.path.join("/media/frigate", output_file)
-
-#     # Check if the file exists to determine if we need to write the header
-#     if not os.path.isfile(csv_output_path):
-#         df.to_csv(csv_output_path, index=False)  # Write header if file does not exist
-#     else:
-#         df.to_csv(csv_output_path, mode='a', header=False, index=False)  # Append without header
-
-#     #print(f"Attributes written to {csv_output_path}")
-
-# def load_labels(labelmap_path):
-#     encodings = ['utf-8', 'latin-1', 'cp1252']  # List of encodings to try
-    
-#     for encoding in encodings:
-#         try:
-#             with open(labelmap_path, 'r', encoding=encoding) as f:
-#                 labels = f.read().strip().splitlines()
-#             return labels
-#         except UnicodeDecodeError:
-#             continue
-    
-#     # If none of the encodings work, try binary mode
-#     try:
-#         with open(labelmap_path, 'rb') as f:
-#             labels = f.read().decode('utf-8', errors='ignore').strip().splitlines()
-#         return labels
-#     except Exception as e:
-#         logger.error(f"Failed to load labels from {labelmap_path}: {str(e)}")
-#         return []
-    
-# def unclip(box, unclip_ratio):
-#         """Unclips the bounding box using pyclipper."""
-#         poly = box.tolist()
-#         distance = cv2.contourArea(box) * unclip_ratio / cv2.arcLength(box, True)
-#         offset = pyclipper.PyclipperOffset()
-#         offset.AddPath(poly, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-#         expanded = np.array(offset.Execute(distance))
-#         return expanded.reshape(-1, 2)
-
-# def post_process_detections(feature_map, thresh=0.5, box_thresh=0.2, unclip_ratio=2.0):
-
-
-#     bitmap = (feature_map > thresh).astype(np.uint8)
-    
-#     dest_width, dest_height = 640, 640  
-    
-#     # Initialize scores list
-#     scores = []
-#     contours, _ = cv2.findContours(bitmap, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-#     boxes = []
-#     confidences = []
-
-#     for contour in contours:
-#         rect = cv2.minAreaRect(contour)
-#         box = cv2.boxPoints(rect)
-#         box = np.int0(box)
-
-#         sside = max(cv2.contourArea(box), 1)
-#         # print(sside)
-#         if sside < 3:
-#             continue
-        
-#         score = cv2.contourArea(box)
-#         # print('score', score)
-
-#         if score < box_thresh:
-#             continue
-
-#         unclipped_box = unclip_cv2(box, unclip_ratio)
-        
-#         # Ensure the box has exactly 4 points
-#         if len(unclipped_box) > 4:
-#             # Get the bounding rectangle of the unclipped polygon
-#             rect = cv2.minAreaRect(unclipped_box)
-#             unclipped_box = cv2.boxPoints(rect)
-
-#         #resize to original size
-#         height, width = bitmap.shape
-#         unclipped_box[:, 0] = np.clip(np.round(unclipped_box[:, 0] / width * dest_width), 0, 640)
-#         unclipped_box[:, 1] = np.clip(np.round(unclipped_box[:, 1] / height * dest_height), 0, 640)
-
-#         boxes.append(unclipped_box.astype(np.int16))
-#         scores.append(score)
-
-#     if not boxes:  # If no boxes were found
-#         return np.array([], dtype=np.int16), []
-        
-#     # Ensure all boxes have the same shape before creating array
-#     boxes = [box[:4] if len(box) > 4 else box for box in boxes]  # Take only first 4 points if more exist
-#     return np.array(boxes, dtype=np.int16), scores
-
-# def order_points(pts):
-#     """Orders the corner points of a rectangle in clockwise order."""
-#     rect = np.zeros((4, 2), dtype="float32")
-
-#     # The top-left point will have the smallest sum, whereas
-#     # the bottom-right point will have the largest sum
-#     s = pts.sum(axis=1)
-#     rect[0] = pts[np.argmin(s)]
-#     rect[2] = pts[np.argmax(s)]
-
-#     # Now, compute the difference between the points,
-#     # the top-right point will have the smallest difference,
-#     # whereas the bottom-left will have the largest difference
-#     diff = np.diff(pts, axis=1)
-#     rect[1] = pts[np.argmin(diff)]
-#     rect[3] = pts[np.argmax(diff)]
-
-#     return rect.astype("int")
-
-# def decode_license_plate_ctc(rec_result, label_file):
-#     """Decodes the recognition result using CTC principles."""
-
-#     print('In decode License plate module')
-#     # print('rec_result size', rec_result.shape)
-#     #print(rec_result)
-#     predicted_indices = np.argmax(rec_result, axis=2)  # Get predicted indices
-
-#     # Load the label file
-#     with open(label_file, 'r') as f:
-#         labels = f.read().splitlines()
-
-#     # Add the '<blank>' character to the labels (crucial for CTC)
-#     labels = ['<blank>'] + labels
-#     # print('label',len(labels))
-
-#     decoded_text = []
-#     # print('Predicted_indices', predicted_indices )
-
-#     for batch_idx in range(predicted_indices.shape[0]):  # Iterate through batch (1)
-#         current_text = ""
-#         previous_char_index = -1  # Initialize to an invalid index
-
-#         #for feature_map_idx in range(predicted_indices.shape[1]): # Iterate through the extra dimension(1)
-#         for i in range(predicted_indices.shape[1]):  # Iterate through sequence length (40)
-#             char_index = predicted_indices[batch_idx, i].item()
-
-#             if char_index != 0 and char_index != previous_char_index:  # Not blank and not a repeat
-#                 current_text += labels[char_index]
-
-#             previous_char_index = char_index
-
-#         decoded_text.append(current_text)
-
-#     print('decoded text',decoded_text)
-#     return decoded_text
-
-# def load_character_dict(file_path):
-#     with open(file_path, 'r') as f:
-#             # Read all lines and strip whitespace
-#         characters = [line.strip() for line in f.readlines()]
-#     return characters
-
-# def min_max_scale(feature_map):
-#     """Scales the feature map to the range [0, 1] using Min-Max scaling."""
-#     min_val = np.min(feature_map)
-#     max_val = np.max(feature_map)
-
-#     if max_val == min_val:
-#         # Handle the case where all values are the same
-#         return np.zeros_like(feature_map)
-
-#     scaled_feature_map = (feature_map - min_val) / (max_val - min_val)
-#     return scaled_feature_map
-
-
 class OvDetectorConfig(BaseDetectorConfig):
     type: Literal[DETECTOR_KEY]
     device: str = Field(default=None, title="Device Type")
@@ -488,9 +262,14 @@ class OvDetector(DetectionApi):
 
     def detect_raw(self, tensor_input):
         infer_request = self.interpreter.create_infer_request()
-        #print("Size of tensor_input:", tensor_input.shape)  # Add this line to print the size
 
-        # TODO: see if we can use shared_memory=True
+        # Normalize and transpose for YOLOv8 and YOLOv11 models
+        if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
+            tensor_input = tensor_input.astype(np.float32) / 255.0
+            # Transpose from NHWC (1,640,640,3) to NCHW (1,3,640,640)
+            tensor_input = np.transpose(tensor_input, (0, 3, 1, 2))
+            print('in detect_raw yolov11 preprocess')
+        
         input_tensor = ov.Tensor(array=tensor_input)
 
         if self.ov_model_type == ModelTypeEnum.dfine:
@@ -595,11 +374,11 @@ class OvDetector(DetectionApi):
             return detections
 
         # Add the YOLOv8/v11 output processing here
-        if self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
+        elif self.ov_model_type in (ModelTypeEnum.yolov8, ModelTypeEnum.yolov11):
             print('In yolov8 openvino')
             # Increment frame counter
             self.frame_counter += 1
-            print('frame number', self.frame_counter)
+            # print('frame number', self.frame_counter)
             current_time = time.time()
 
             out_tensor = infer_request.get_output_tensor()

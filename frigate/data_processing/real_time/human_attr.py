@@ -50,7 +50,7 @@ class HumanAttrRealTimeProcessor(RealTimeProcessorApi):
         self.__build_detector()
 
     def __build_detector(self) -> None:
-        self.interpreter = ov.Core().compile_model(human_attr_model_path, "CPU")
+        self.interpreter = ov.Core().compile_model(self.model_path, "CPU")
 
         # self.interpreter.allocate_tensors()
         # self.tensor_input_details = self.interpreter.get_input_details()
@@ -62,6 +62,8 @@ class HumanAttrRealTimeProcessor(RealTimeProcessorApi):
                 self.labelmap[i] = line.strip()  # Store labels in the labelmap
 
     def process_frame(self, obj_data, frame):
+
+        print('inside process_frame human attr')
         if obj_data["label"] != "person":
             return
 

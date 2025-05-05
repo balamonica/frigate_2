@@ -55,8 +55,6 @@ class LocalObjectDetector(ObjectDetector):
             self.dtype = InputDTypeEnum.int
 
         self.detect_api = create_detector(detector_config)
-        self.vehicle_alpr_enabled = detector_config.model.vehicle_alpr
-        
 
     def detect(self, tensor_input: np.ndarray, threshold=0.4):
         detections = []
@@ -96,7 +94,6 @@ def run_detector(
     start: Value,
     detector_config: BaseDetectorConfig,
 ):
-    print("detector_name:",name)
     threading.current_thread().name = f"detector:{name}"
     logger = logging.getLogger(f"detector.{name}")
     logger.info(f"Starting detection process: {os.getpid()}")
@@ -112,9 +109,8 @@ def run_detector(
     signal.signal(signal.SIGINT, receiveSignal)
 
     frame_manager = SharedMemoryFrameManager()
-    #print("detector_config",detector_config)
     object_detector = LocalObjectDetector(detector_config=detector_config)
-    
+
     outputs = {}
     for name in out_events.keys():
         out_shm = UntrackedSharedMemory(name=f"out-{name}", create=False)
@@ -137,22 +133,15 @@ def run_detector(
 
         # detect and send the output
         start.value = datetime.datetime.now().timestamp()
-        #print('in object_detector')
-        #print('obj detector type', type(object_detector))
         detections = object_detector.detect_raw(input_frame)
-        #print("Detections:", detections)
         duration = datetime.datetime.now().timestamp() - start.value
         frame_manager.close(connection_id)
         outputs[connection_id]["np"][:] = detections[:]
         out_events[connection_id].set()
         start.value = 0.0
-        # print('In object_detection _ while loop')
+
         avg_speed.value = (avg_speed.value * 9 + duration) / 10
-    # print('out object_detection _ while loop')
-    # vehicle_alpr_enabled = detector_config.model.vehicle_alpr
-    # if vehicle_alpr_enabled:
-    #     object_detector.vehicle_alpr()
-    
+
     logger.info("Exited detection process...")
 
 
