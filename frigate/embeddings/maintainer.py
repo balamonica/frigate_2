@@ -43,6 +43,12 @@ from frigate.data_processing.post.license_plate import (
 from frigate.data_processing.real_time.api import RealTimeProcessorApi
 from frigate.data_processing.real_time.bird import BirdRealTimeProcessor
 from frigate.data_processing.real_time.human_attr import HumanAttrRealTimeProcessor
+from frigate.data_processing.real_time.vehicle_attr import VehicleAttrRealTimeProcessor
+from frigate.data_processing.real_time.fall_detection import FalldetectionRealTimeProcessor
+from frigate.data_processing.real_time.fight_detection import FightdetectionRealTimeProcessor
+from frigate.data_processing.real_time.calling_detection import CalldetectionRealTimeProcessor
+
+
 
 from frigate.data_processing.real_time.face import FaceRealTimeProcessor
 from frigate.data_processing.real_time.license_plate import (
@@ -138,6 +144,38 @@ class EmbeddingMaintainer(threading.Thread):
             print('in embedding>maintainer.py human_attr section')
             self.realtime_processors.append(
                 HumanAttrRealTimeProcessor(
+                    self.config, self.event_metadata_publisher, metrics
+                )
+            )
+
+        if self.config.classification.vehicle_attr.enabled:
+            print('in embedding>maintainer.py vehicle_attr section')
+            self.realtime_processors.append(
+                VehicleAttrRealTimeProcessor(
+                    self.config, self.event_metadata_publisher, metrics
+                )
+            )
+
+        if self.config.classification.fall_det.enabled:
+            print('in embedding>maintainer.py fall_det section')
+            self.realtime_processors.append(
+                FalldetectionRealTimeProcessor(
+                    self.config, self.event_metadata_publisher, metrics
+                )
+            )
+
+        if self.config.classification.fight_det.enabled:
+            print('in embedding>maintainer.py fight_det section')
+            self.realtime_processors.append(
+                FightdetectionRealTimeProcessor(
+                    self.config, self.event_metadata_publisher, metrics
+                )
+            )
+
+        if self.config.classification.call_det.enabled:
+            print('in embedding>maintainer.py call_det section')
+            self.realtime_processors.append(
+                CalldetectionRealTimeProcessor(
                     self.config, self.event_metadata_publisher, metrics
                 )
             )

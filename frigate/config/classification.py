@@ -50,6 +50,58 @@ class HumanattrClassificationConfig(FrigateBaseModel):
         title="Path to the human attribute detection labels."
     )
 
+class VehicleattrClassificationConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Enable vehicle attribute detection.")
+    threshold: float = Field(
+        default=0.6,
+        title="Minimum classification score required for the attributes",
+        gt=0.0,
+        le=1.0,
+    )
+    vehicle_attr_model_path: str = Field(
+        default="/models/vehicle_attribute_model/vehiattr_model.onnx",  # Set a sensible default path
+        title="Path to the vehicle attribute detection model."
+    )
+    vehicle_attr_label_path: str = Field(
+        default="/models/vehicle_attribute_model/vehicle_attr_label.txt",  # Set a sensible default path
+        title="Path to the vehicle attribute detection labels."
+    )
+
+class FalldetectionClassificationConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Enable falling detection.")
+    threshold: float = Field(
+        default=0.6,
+        title="Minimum classification score required for the falling",
+    )
+    falling_model_path: str = Field(
+        default="/models/human_falling/falling_detection.onnx",  # Set a sensible default path
+        title="Path to the fall detection model."
+    )
+
+class FightdetectionClassificationConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Enable fight detection.")
+    threshold: float = Field(
+        default=0.6,
+        title="Minimum classification score required for the fighting",
+    )
+    fighting_model_path: str = Field(
+        default="/models/human_fighting/fight_detection.onnx",  # Set a sensible default path
+        title="Path to the fight detection model."
+    )
+
+
+class CalldetectionClassificationConfig(FrigateBaseModel):
+    enabled: bool = Field(default=False, title="Enable fight detection.")
+    threshold: float = Field(
+        default=0.6,
+        title="Minimum classification score required for the fighting",
+    )
+    calling_model_path: str = Field(
+        default="/models/human_calling/calling_detection.onnx",  # Set a sensible default path
+        title="Path to the call detection model."
+    )
+
+
 
 class ClassificationConfig(FrigateBaseModel):
     bird: BirdClassificationConfig = Field(
@@ -57,6 +109,18 @@ class ClassificationConfig(FrigateBaseModel):
     )
     human_attr: HumanattrClassificationConfig = Field(
         default_factory=HumanattrClassificationConfig, title="Human attr classification config."
+    )
+    vehicle_attr: VehicleattrClassificationConfig = Field(
+        default_factory=VehicleattrClassificationConfig, title="Vehicle attr classification config."
+    )
+    fall_det: FalldetectionClassificationConfig = Field(
+    default_factory=FalldetectionClassificationConfig, title="Falling classification config."
+    )
+    fight_det: FightdetectionClassificationConfig = Field(
+    default_factory=FightdetectionClassificationConfig, title="Fighting classification config."
+    )
+    call_det: CalldetectionClassificationConfig = Field(
+    default_factory=CalldetectionClassificationConfig, title="Calling classification config."
     )
 
 class SemanticSearchConfig(FrigateBaseModel):
