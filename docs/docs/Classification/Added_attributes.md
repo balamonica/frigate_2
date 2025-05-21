@@ -114,5 +114,26 @@ Instruction:
  * model input size is (256, 192)
 
 
+* Action detection model
+  There are 3 action detection models integrated from frigate. Namely
+    * Calling detection model
+    * falling detection model
+    * fighting detection model
 
+  Download location:
+
+ * Calling detection model:
+   This model detects calling action in the video. 
+
+    | Calling Recognition | PP-HGNet | Precision Rate: 86.85 | Single Person 2.94ms | [Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/PPHGNet_tiny_calling_halfbody.pdparams) | [Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/PPHGNet_tiny_calling_halfbody.zip) |
+
+ * Falling action detection model:
+    This model detects when a person falls. It is to be noted this model works on a series of 8 frames. i.e all 8 frames are used to detect if there is falling action happening in the scene. If the falling happens the label is displayed in the 8th frame. There is a possibility that the image corresponding to the 8th frame is not having any falling scene as such. 
+
+    | Falling Recognition            | ST-GCN    | Precision Rate: 96.43     | Single Person 2.7ms                 | - |[Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/STGCN.zip)                      |
+
+ * Fighting detection model:
+    This model detects when there is fight in the scene. It is to be noted this model works on a series of 8 frames. i.e all 8 frames are used to detect if there is fighting action happening in the scene. If the fighting happens the labelis displayed in the 8th frame. There is a possibility that the image corresponding to the 8th frame is not having any fighting scene as such. 
+
+    | Fighting Recognition | PP-TSM | Precision Rate: 89.06% | 128ms for a 2sec video | [Link](https://videotag.bj.bcebos.com/PaddleVideo-release2.3/ppTSM_fight.pdparams) | [Link](https://videotag.bj.bcebos.com/PaddleVideo-release2.3/ppTSM_fight.zip) |
 
