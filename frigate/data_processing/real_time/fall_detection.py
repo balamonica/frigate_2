@@ -126,6 +126,8 @@ class FalldetectionRealTimeProcessor(RealTimeProcessorApi):
                     EventMetadataTypeEnum.sub_label,
                     (obj_data["id"], detected_labels, None)  # Pass the list of labels
                 )
+        else:
+            return
 
         # Continue with the rest of your processing logic...
 
