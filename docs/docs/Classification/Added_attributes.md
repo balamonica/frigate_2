@@ -145,3 +145,6 @@ Instruction:
 
     | Fighting Recognition | PP-TSM | Precision Rate: 89.06% | 128ms for a 2sec video | [Link](https://videotag.bj.bcebos.com/PaddleVideo-release2.3/ppTSM_fight.pdparams) | [Link](https://videotag.bj.bcebos.com/PaddleVideo-release2.3/ppTSM_fight.zip) |
 
+
+
+
