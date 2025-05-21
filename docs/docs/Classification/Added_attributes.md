@@ -72,6 +72,8 @@ Instruction:
 
 for details regarding attribute detection model kindly refer to paddledetection or pphuman documentation
 
+![Human attributes example](Human_attributes.png)
+
 * Vehicle attribute detection model
 
 Vehicle attribute recognition is widely used in smart cities, smart transportation and other scenarios. In PP-Vehicle, a vehicle attribute recognition module is integrated, which can identify vehicle color and model.
@@ -113,6 +115,8 @@ Instruction:
  * the detected attributes are displayed on the frigate webUI
  * model input size is (256, 192)
 
+ ![Vehicle attributes example](vehicle_attributes.png)
+
 
 * Action detection model
   There are 3 action detection models integrated from frigate. Namely
@@ -127,10 +131,14 @@ Instruction:
 
     | Calling Recognition | PP-HGNet | Precision Rate: 86.85 | Single Person 2.94ms | [Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/PPHGNet_tiny_calling_halfbody.pdparams) | [Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/PPHGNet_tiny_calling_halfbody.zip) |
 
+   ![Calling Detection Example](Calling_detection.png)
+
  * Falling action detection model:
     This model detects when a person falls. It is to be noted this model works on a series of 8 frames. i.e all 8 frames are used to detect if there is falling action happening in the scene. If the falling happens the label is displayed in the 8th frame. There is a possibility that the image corresponding to the 8th frame is not having any falling scene as such. 
 
-    | Falling Recognition            | ST-GCN    | Precision Rate: 96.43     | Single Person 2.7ms                 | - |[Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/STGCN.zip)                      |
+    | Falling Recognition            | ST-GCN    | Precision Rate: 96.43     | Single Person 2.7ms                 | - |[Link](https://bj.bcebos.com/v1/paddledet/models/pipeline/STGCN.zip)                      |
+
+    ![Falling detection example](falling_detection.png)
 
  * Fighting detection model:
     This model detects when there is fight in the scene. It is to be noted this model works on a series of 8 frames. i.e all 8 frames are used to detect if there is fighting action happening in the scene. If the fighting happens the labelis displayed in the 8th frame. There is a possibility that the image corresponding to the 8th frame is not having any fighting scene as such. 
